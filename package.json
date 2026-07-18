@@ -1,8 +1,10 @@
 {
   "name": "study-log",
   "private": true,
-  "version": "4.0.1",
+  "version": "4.0.2",
   "type": "module",
+  "license": "MIT",
+  "author": "pyjhoop",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

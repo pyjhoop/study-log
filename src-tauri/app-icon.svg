@@ -1,0 +1,59 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6d6af5"/>
+      <stop offset="1" stop-color="#4338ca"/>
+    </linearGradient>
+    <linearGradient id="arc" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fcd34d"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+
+  <!-- rounded-square app background -->
+  <rect x="0" y="0" width="1024" height="1024" rx="228" fill="url(#bg)"/>
+
+  <!-- soft top highlight -->
+  <rect x="0" y="0" width="1024" height="1024" rx="228" fill="#ffffff" opacity="0.06"/>
+
+  <!-- progress ring (time-tracking) -->
+  <g transform="rotate(-90 512 512)">
+    <circle cx="512" cy="512" r="338" fill="none" stroke="#ffffff" stroke-opacity="0.16" stroke-width="44"/>
+    <circle cx="512" cy="512" r="338" fill="none" stroke="url(#arc)" stroke-width="44"
+            stroke-linecap="round" stroke-dasharray="1444 680"/>
+  </g>
+
+  <!-- soft shadow under the book -->
+  <ellipse cx="512" cy="672" rx="248" ry="30" fill="#1e1b4b" opacity="0.22"/>
+
+  <!-- open book -->
+  <g>
+    <!-- left page -->
+    <path d="M512 458
+             C452 430 360 424 276 442
+             C264 445 256 456 256 469
+             L256 626
+             C256 641 269 652 284 649
+             C362 634 452 640 512 664 Z"
+          fill="#ffffff"/>
+    <!-- right page -->
+    <path d="M512 458
+             C572 430 664 424 748 442
+             C760 445 768 456 768 469
+             L768 626
+             C768 641 755 652 740 649
+             C662 634 572 640 512 664 Z"
+          fill="#ffffff"/>
+    <!-- spine shadow between pages -->
+    <path d="M512 458 L512 664" stroke="#c7d2fe" stroke-width="10" stroke-linecap="round"/>
+
+    <!-- text lines (left) -->
+    <path d="M332 492 L470 502" stroke="#a5b4fc" stroke-width="14" stroke-linecap="round"/>
+    <path d="M320 540 L468 548" stroke="#c7d2fe" stroke-width="14" stroke-linecap="round"/>
+    <path d="M320 588 L468 594" stroke="#c7d2fe" stroke-width="14" stroke-linecap="round"/>
+    <!-- text lines (right) -->
+    <path d="M554 502 L692 492" stroke="#a5b4fc" stroke-width="14" stroke-linecap="round"/>
+    <path d="M556 548 L704 540" stroke="#c7d2fe" stroke-width="14" stroke-linecap="round"/>
+    <path d="M556 594 L704 588" stroke="#c7d2fe" stroke-width="14" stroke-linecap="round"/>
+  </g>
+</svg>
