@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { LayoutDashboard, BarChart3, ListChecks, BookOpen, Settings } from "lucide-react";
+import { LayoutDashboard, BarChart3, ListChecks, BookOpen, Settings, LifeBuoy } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Toaster } from "sonner";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,7 @@ import { RecordsScreen } from "@/components/records/RecordsScreen";
 import { DashboardScreen } from "@/components/dashboard/DashboardScreen";
 import { StatsScreen } from "@/components/stats/StatsScreen";
 import { SettingsScreen } from "@/components/settings/SettingsScreen";
+import { SupportScreen } from "@/components/support/SupportScreen";
 import { UpdateDialog } from "@/components/UpdateDialog";
 import { useSessionRecorder } from "@/hooks/useSessionRecorder";
 import { useLiveSessionGuard } from "@/hooks/useLiveSessionGuard";
@@ -15,7 +16,7 @@ import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
 import { useTray } from "@/hooks/useTray";
 import { onFocusMain } from "@/lib/ipc";
 
-type Screen = "dashboard" | "stats" | "records" | "subjects" | "settings";
+type Screen = "dashboard" | "stats" | "records" | "subjects" | "settings" | "support";
 
 const NAV: { id: Screen; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "dashboard", label: "대시보드", icon: LayoutDashboard },
@@ -23,9 +24,10 @@ const NAV: { id: Screen; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "records", label: "기록", icon: ListChecks },
   { id: "subjects", label: "과목 관리", icon: BookOpen },
   { id: "settings", label: "설정", icon: Settings },
+  { id: "support", label: "문의", icon: LifeBuoy },
 ];
 
-const SCREENS: Screen[] = ["dashboard", "stats", "records", "subjects", "settings"];
+const SCREENS: Screen[] = ["dashboard", "stats", "records", "subjects", "settings", "support"];
 
 export default function MainApp() {
   const [screen, setScreen] = useState<Screen>("dashboard");
@@ -92,7 +94,7 @@ export default function MainApp() {
             </button>
           ))}
         </nav>
-        <div className="mt-auto px-2 text-[10px] text-muted-foreground">v4.0.1</div>
+        <div className="mt-auto px-2 text-[10px] text-muted-foreground">v4.1.0</div>
       </aside>
 
       {/* 콘텐츠 */}
@@ -109,6 +111,8 @@ export default function MainApp() {
             <DashboardScreen />
           ) : screen === "stats" ? (
             <StatsScreen />
+          ) : screen === "support" ? (
+            <SupportScreen />
           ) : (
             <SettingsScreen />
           )}

@@ -25,7 +25,10 @@
     "notification:allow-request-permission",
     {
       "identifier": "http:default",
-      "allow": [{ "url": "https://api.github.com/*" }]
+      "allow": [
+        { "url": "https://api.github.com/*" },
+        { "url": "https://api.web3forms.com/*" }
+      ]
     }
   ]
 }
