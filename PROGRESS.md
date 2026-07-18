@@ -24,6 +24,7 @@
 | 8 | 폴리시 & 패키징 (빈 상태/에러, 아이콘, 빌드) | ✅ 완료 |
 | 9 | **v2**: 비정상 종료 세션 자동 복구 · Windows 자동 시작 · GitHub 백업/복원 · Actions 릴리스 자동화 | ✅ 완료 |
 | 10 | **v3**: 오버레이 레이아웃(variant) 6종 · 에셋 파일명 영문화(productName) · v3.0.0 | ✅ 완료 |
+| 11 | **v3.1**: 대시보드 학습 잔디(GitHub 컨트리뷰션 히트맵) · v3.1.0 | ✅ 완료 |
 
 - v2 기획: [`docs/03-v2-기능-기획.md`](./docs/03-v2-기능-기획.md)
 
@@ -48,6 +49,19 @@ npm run tauri build    # 배포 빌드 (단계 8)
 ---
 
 ## 단계별 완료 로그
+
+### ✅ 단계 11 — v3.1 (대시보드 학습 잔디) (2026-07-18)
+버전 **3.0.0 → 3.1.0**(`tauri.conf.json`/`Cargo.toml`/`package.json`/사이드바).
+
+**한 일**
+- **학습 잔디**(GitHub 컨트리뷰션 그래프 형태의 일별 히트맵)를 **대시보드 최하단**에 추가. 순수 프론트(Rust/capabilities/마이그레이션 변경 없음, 기존 `useStats.rows` 재사용).
+  - `lib/stats.ts` `buildHeatmap(rows, weeksCount=53, now)`: 세션을 날짜별 합계로 접고 **최근 53주(약 1년)**를 **월요일 시작**(앱의 주 경계 규약과 일치) 열들로 만든다. 각 주는 7칸(월~일). 마지막 열이 이번 주이고 오늘 이후 날짜는 `inRange:false`(빈 칸)로 정렬만 유지. 월이 바뀌는 열에 월 라벨(`months`). 타입 `HeatCell`/`Heatmap` 추가.
+  - `components/dashboard/ContributionHeatmap.tsx`: 열=주/행=요일 격자, 셀 11px. **색 단계 0~4는 일일 목표(`goalMin`) 대비 비율**(0 / <50% / <100% / <150% / ≥150%)로 결정, 목표 미설정(0)이면 절대 시간(30분/1시간/2시간)으로 폴백. 색은 앱 테마 **teal** 스케일 + 라이트/다크 대응. 월 라벨(상단)·요일 라벨(월/수/금)·범례(적음→많음)·"최근 1년 N일 학습" 카운트. 셀 `title`에 `formatDayLabel · 공부시간`(hover 툴팁). 좁은 화면 대비 `overflow-x-auto`.
+  - `components/dashboard/DashboardScreen.tsx`: 최근 세션 카드 아래에 `<ContributionHeatmap rows={rows} goalMin={goalMin} />` 연결.
+
+**검증 결과**
+- `npm run build` ✅ (tsc + vite, 2271 모듈) · `cargo check` ✅ (버전 문자열만 변경, 에러 0).
+- ⏳ 런타임 E2E는 **사용자 테스트 대기** — `npm run tauri dev` 후 대시보드 하단에서: ①기록 있는 날이 teal로, 공부량 많을수록 진하게 칠해지는지 ②오늘 이후 날짜는 빈 칸 ③셀 hover 시 날짜+공부시간 툴팁 ④월/요일 라벨·범례 정렬 ⑤측정 종료 시 오늘 칸 자동 반영(session-saved) ⑥라이트/다크 색 대비 ⑦일일 목표 바꾸면 색 단계 기준 변화.
 
 ### ✅ 단계 10 — v3 (오버레이 레이아웃 6종 · 파일명 영문화 · v3.0.0) (2026-07-18)
 **기획**: [`plans/v3`]. 버전 **2.0.0 → 3.0.0**.
@@ -234,7 +248,7 @@ src/
     ui/{button,input,Switch,Modal,ConfirmDialog}.tsx
     subjects/{SubjectsScreen,SubjectEditor}.tsx
     records/{RecordsScreen,SessionEditor}.tsx   # 세션 일별 목록/수정/삭제/수동 추가·메모
-    dashboard/{DashboardScreen,LiveMeasure,GoalRing,StudyBarChart,SubjectDonut}.tsx  # 통합 요약 대시보드(Recharts)
+    dashboard/{DashboardScreen,LiveMeasure,GoalRing,StudyBarChart,SubjectDonut,ContributionHeatmap}.tsx  # 통합 요약 대시보드(Recharts) + 학습 잔디
     stats/{StatsScreen,ComparisonCard,PeriodTable}.tsx  # 일/주/월 통계 + 지난 기간 같은 시점 대비 증감
     settings/{SettingsScreen,parts,GoalSection,PomodoroSection,OverlaySection,HotkeysSection,HotkeyCapture,GeneralSection}.tsx  # 설정 5섹션 + 핫키 캡처
 src-tauri/

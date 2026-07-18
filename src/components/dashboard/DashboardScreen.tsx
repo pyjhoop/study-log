@@ -12,6 +12,7 @@ import {
 } from "@/lib/stats";
 import { formatClock, formatDurationKo } from "@/lib/time";
 import { cn } from "@/lib/utils";
+import { ContributionHeatmap } from "./ContributionHeatmap";
 import { GoalRing } from "./GoalRing";
 import { LiveMeasure } from "./LiveMeasure";
 import { StudyBarChart } from "./StudyBarChart";
@@ -72,6 +73,9 @@ export function DashboardScreen() {
         <SubjectDonut slices={slices} />
         <RecentSessions sessions={recent} loading={loading} />
       </div>
+
+      {/* 학습 잔디(최근 1년 일별 히트맵) */}
+      <ContributionHeatmap rows={rows} goalMin={goalMin} />
     </div>
   );
 }

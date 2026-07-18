@@ -74,6 +74,26 @@ export interface PeriodStats {
   canGoNewer: boolean;
 }
 
+/** 히트맵(잔디) 한 칸 = 하루. */
+export interface HeatCell {
+  /** 날짜 키 `YYYY-MM-DD`. */
+  key: string;
+  /** 날짜 0시 epoch(초) — 툴팁 라벨용. */
+  sec: number;
+  /** 그날 공부 시간 합계(초). */
+  total: number;
+  /** 표시 범위(과거~오늘) 안이면 true. 이번 주의 미래 날짜 등 패딩 칸은 false. */
+  inRange: boolean;
+}
+
+/** GitHub 잔디 형태의 일별 학습시간 히트맵. */
+export interface Heatmap {
+  /** 열(주) 단위, 오래된 주 → 최근 주. 각 주는 7칸(월~일). */
+  weeks: HeatCell[][];
+  /** 열 인덱스 → 그 열에서 달이 바뀔 때의 월 라벨. */
+  months: { col: number; label: string }[];
+}
+
 /** 과목별 분포 조각. */
 export interface SubjectSlice {
   subject_id: number;
@@ -305,6 +325,54 @@ export function focusedStats(
     endSec,
     canGoNewer: offset > 0,
   };
+}
+
+/**
+ * 최근 `weeksCount`주의 일별 학습시간 히트맵(월요일 시작, GitHub 잔디 형태).
+ * 마지막 열이 이번 주다. 이번 주의 오늘 이후 날짜는 `inRange:false`(빈 칸)로 둔다.
+ */
+export function buildHeatmap(
+  rows: StatRow[],
+  weeksCount = 53,
+  now = new Date(),
+): Heatmap {
+  // 날짜별 합계.
+  const totals = new Map<string, number>();
+  for (const r of rows) {
+    const k = dateKey(new Date(r.started_at * 1000));
+    totals.set(k, (totals.get(k) ?? 0) + r.duration_sec);
+  }
+
+  const todayMs = startOfDay(now).getTime();
+  const thisWeekStart = startOfWeek(now);
+  const weeks: HeatCell[][] = [];
+  const months: { col: number; label: string }[] = [];
+  let prevMonth = -1;
+
+  for (let c = 0; c < weeksCount; c++) {
+    const weekStart = new Date(thisWeekStart);
+    weekStart.setDate(weekStart.getDate() - (weeksCount - 1 - c) * 7);
+    const week: HeatCell[] = [];
+    for (let d = 0; d < 7; d++) {
+      const day = new Date(weekStart);
+      day.setDate(day.getDate() + d);
+      const k = dateKey(day);
+      week.push({
+        key: k,
+        sec: sec(day),
+        total: totals.get(k) ?? 0,
+        inRange: day.getTime() <= todayMs,
+      });
+    }
+    // 월 라벨: 이 주의 첫날(월요일) 기준 달이 바뀌는 열에만.
+    const m = weekStart.getMonth();
+    if (m !== prevMonth) {
+      months.push({ col: c, label: `${m + 1}월` });
+      prevMonth = m;
+    }
+    weeks.push(week);
+  }
+  return { weeks, months };
 }
 
 /** 오늘/이번주/이번달 누적(초). */
