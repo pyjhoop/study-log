@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { LayoutDashboard, ListChecks, BookOpen, Settings } from "lucide-react";
+import { Toaster } from "sonner";
 import { cn } from "@/lib/utils";
+import { SubjectsScreen } from "@/components/subjects/SubjectsScreen";
 
 type Screen = "dashboard" | "records" | "subjects" | "settings";
 
@@ -56,14 +58,20 @@ export default function MainApp() {
           <h2 className="text-base font-semibold">{active.label}</h2>
         </header>
         <section className="flex-1 overflow-auto p-6">
-          <div className="flex h-full items-center justify-center rounded-xl border border-dashed">
-            <div className="max-w-md text-center">
-              <active.icon className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">{PLACEHOLDER[screen]}</p>
+          {screen === "subjects" ? (
+            <SubjectsScreen />
+          ) : (
+            <div className="flex h-full items-center justify-center rounded-xl border border-dashed">
+              <div className="max-w-md text-center">
+                <active.icon className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">{PLACEHOLDER[screen]}</p>
+              </div>
             </div>
-          </div>
+          )}
         </section>
       </main>
+
+      <Toaster richColors position="bottom-right" />
     </div>
   );
 }
