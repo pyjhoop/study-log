@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "quickstart-capability",
+  "description": "빠른 시작 피커 창 권한 (표시/포커스 제어는 단계 4에서 추가)",
+  "windows": ["quickstart"],
+  "permissions": [
+    "core:default",
+    "sql:default"
+  ]
+}

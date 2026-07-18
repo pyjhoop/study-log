@@ -1,0 +1,9 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "timer-capability",
+  "description": "타이머 오버레이 창 권한 (이동/크기조절/표시 제어는 단계 3에서 추가)",
+  "windows": ["timer"],
+  "permissions": [
+    "core:default"
+  ]
+}
