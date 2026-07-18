@@ -5,10 +5,26 @@
 학습 시간을 측정·기록하고 일/주/월 통계를 시각화합니다. 모든 데이터는 내 PC의 로컬 SQLite에만 저장되어 밖으로 나가지 않습니다.
 
 <p>
-  <img alt="version" src="https://img.shields.io/badge/version-4.0.1-6366f1">
+  <img alt="version" src="https://img.shields.io/github/v/release/pyjhoop/study-log?label=version&color=6366f1">
+  <img alt="downloads" src="https://img.shields.io/github/downloads/pyjhoop/study-log/total?color=24C8DB">
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows-0078D6">
+  <img alt="license" src="https://img.shields.io/github/license/pyjhoop/study-log?color=green">
   <img alt="stack" src="https://img.shields.io/badge/Tauri%20v2-React%2019%20%C2%B7%20Rust%20%C2%B7%20SQLite-24C8DB">
 </p>
+
+## ⬇️ 다운로드
+
+**Windows 10/11 · 무료 · 설치 한 번이면 이후 새 버전은 자동 업데이트됩니다.**
+
+<p>
+  <a href="https://github.com/pyjhoop/study-log/releases/latest">
+    <img alt="Download for Windows" src="https://img.shields.io/github/v/release/pyjhoop/study-log?style=for-the-badge&label=DOWNLOAD&color=24C8DB&logo=windows&logoColor=white">
+  </a>
+</p>
+
+👉 **[Releases 페이지에서 최신 `StudyLog_x.x.x_x64-setup.exe` 내려받기](https://github.com/pyjhoop/study-log/releases/latest)**
+
+> ⚠️ 코드 서명이 없는 빌드라 처음 실행할 때 Windows SmartScreen이 *"Windows가 PC를 보호했습니다 / 알 수 없는 게시자"* 경고를 띄울 수 있습니다. 바이러스가 아니라 서명되지 않은 앱이라는 뜻이며, **추가 정보(More info) → 실행(Run anyway)** 을 누르면 설치됩니다.
 
 ---
 
