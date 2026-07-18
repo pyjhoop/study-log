@@ -9,6 +9,7 @@ import { DashboardScreen } from "@/components/dashboard/DashboardScreen";
 import { StatsScreen } from "@/components/stats/StatsScreen";
 import { SettingsScreen } from "@/components/settings/SettingsScreen";
 import { useSessionRecorder } from "@/hooks/useSessionRecorder";
+import { useLiveSessionGuard } from "@/hooks/useLiveSessionGuard";
 import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
 import { useTray } from "@/hooks/useTray";
 import { onFocusMain } from "@/lib/ipc";
@@ -31,6 +32,8 @@ export default function MainApp() {
 
   // 측정 종료 요약을 받아 세션을 저장하는 단일 리스너(오버레이/핫키/트레이 종료 모두 여기로).
   useSessionRecorder();
+  // 진행 중 세션을 DB에 기록해두고 비정상 종료 시 자동 복구(F1).
+  useLiveSessionGuard();
   // 트레이 툴팁을 측정 상태에 맞춰 갱신(트레이 자체는 Rust가 소유).
   useTray();
 
@@ -88,7 +91,7 @@ export default function MainApp() {
             </button>
           ))}
         </nav>
-        <div className="mt-auto px-2 text-[10px] text-muted-foreground">v1.0.0</div>
+        <div className="mt-auto px-2 text-[10px] text-muted-foreground">v2.0.0</div>
       </aside>
 
       {/* 콘텐츠 */}

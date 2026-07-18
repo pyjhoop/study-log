@@ -22,6 +22,9 @@
 | 6 | 대시보드 통계 (일/주/월 + 오늘 목표 링) | ✅ 완료 |
 | 7 | 부가기능: 뽀모도로/목표 → 트레이 → 오버레이 커스터마이즈 + 설정 화면 | ✅ 완료 |
 | 8 | 폴리시 & 패키징 (빈 상태/에러, 아이콘, 빌드) | ✅ 완료 |
+| 9 | **v2**: 비정상 종료 세션 자동 복구 · Windows 자동 시작 · GitHub 백업/복원 · Actions 릴리스 자동화 | ✅ 완료 |
+
+- v2 기획: [`docs/03-v2-기능-기획.md`](./docs/03-v2-기능-기획.md)
 
 ---
 
@@ -44,6 +47,24 @@ npm run tauri build    # 배포 빌드 (단계 8)
 ---
 
 ## 단계별 완료 로그
+
+### ✅ 단계 9 — v2 (자동복구 · 자동시작 · GitHub 백업/복원 · 릴리스 자동화) (2026-07-18)
+**기획**: [`docs/03-v2-기능-기획.md`](./docs/03-v2-기능-기획.md) (F1~F4). 버전 **1.0.0 → 2.0.0** 승격(`tauri.conf.json`/`Cargo.toml`/`package.json`/사이드바).
+
+**한 일**
+- **F1 · 비정상 종료 세션 자동 복구**(Rust 무변경): 측정 상태가 Rust 인메모리에만 있고 `stop_session` 때만 DB INSERT되던 구조라, 타이머 켠 채 PC 종료/강제종료 시 세션 전체가 유실되던 문제 해결. `lib/liveSession.ts`(settings key `live_session`에 진행 중 스냅샷 upsert/read/clear) + `hooks/useLiveSessionGuard.ts`(메인 창 1회 마운트). ①**복구**: 시작 시 Rust가 idle인데 잔재가 있으면 = 비정상 종료 → 마지막 하트비트 시점까지 자동 저장(기존 `saveSession` 재사용)+toast+`session-saved`. ②**지속화**: `session-changed`로 running/paused면 스냅샷 기록, idle이면 삭제(정상 종료 시 잔재 제거→중복 저장 방지). ③**하트비트**: 측정 중 25초 간격으로 스냅샷 갱신(손실 ≤ 25초). 웹뷰만 리로드된 경우(Rust running/paused)는 복구 안 함. `MainApp`에 `useSessionRecorder` 옆에 마운트.
+- **F2 · Windows 자동 시작**: `tauri-plugin-autostart` 추가(Cargo+npm), `lib.rs` `#[cfg(desktop)]`에 `init(LaunchAgent, Some(["--autostart"]))` 등록. **조용한 상주**: `main` 창을 `visible:false`로 바꾸고, setup에서 `std::env::args()`에 `--autostart`가 **없을 때만** main 창 `show()+set_focus()`(부팅 실행이면 트레이만 상주). 설정 "일반" 섹션(`GeneralSection.tsx`)에 자동 시작 토글(`isEnabled`/`enable`/`disable`). `main.json`에 `autostart:default` 권한.
+- **F3 · GitHub 백업/복원**: `tauri-plugin-http` 추가(Cargo+npm), `lib.rs`에 `.plugin(tauri_plugin_http::init())`, `main.json`에 http 권한을 **api.github.com로 스코프 제한**. `lib/backup.ts` — `exportData`(subjects/sessions/settings 전량 → `{version:2,...}`, **민감/휘발 key 제외**: `github_token`/`backup_config`/`last_backup_at`/`live_session`), `pushBackup`(Contents API: GET sha → PUT base64(UTF-8) JSON, `Bearer` 토큰), `restoreBackup`(GET→파싱→**전체 교체**: sessions/subjects DELETE 후 id 보존 INSERT + settings upsert). 한글 때문에 `btoa` 대신 TextEncoder→base64 헬퍼. UI `components/settings/BackupSection.tsx`(owner/repo/branch/path/토큰 입력·저장, "지금 백업"·마지막 백업 시각, "복원"은 `ConfirmDialog` 뒤, 미설정 시 버튼 비활성, 토큰 평문 저장 안내). `SettingsScreen`에 섹션 연결. **토큰은 로컬 SQLite 평문 저장**(개인용, OS 키체인은 Not-V2).
+- **F4 · GitHub Actions 릴리스 자동화**: `.github/workflows/release.yml` — `v*` 태그 push(또는 수동) → `windows-latest`에서 checkout/Node20+npm ci/Rust+캐시/`tauri-apps/tauri-action`으로 빌드 + Release 생성·업로드. `GITHUB_TOKEN`으로 업로드, 미서명(서명 secrets 자리는 주석), NSIS만(한글 productName→WiX 비활성 유지).
+
+**검증 결과**
+- `npm run build` ✅ (tsc + vite, 2263 모듈) · `cargo check` ✅ (autostart·http 플러그인 컴파일, 경고·에러 0, `study-log v2.0.0`).
+- ⏳ 런타임 E2E는 **사용자 테스트 대기** — `npm run tauri dev`(또는 설치파일) 후:
+  - **F1**: 측정 시작→25초+ 후 작업관리자로 강제 종료(또는 트레이 "종료") → 재실행 시 "비정상 종료된 세션 자동 저장" toast + 기록/대시보드에 반영. 정상 종료(stop) 후 재실행 시엔 복구 없음(중복 X). 측정 중 F5 리로드는 복구 아님(Rust 생존).
+  - **F2**: 설정 "일반"에서 자동 시작 ON → 재부팅 시 창 없이 트레이만 상주, 좌클릭 복귀. OFF 시 해제.
+  - **F3**: 설정 "GitHub 백업"에 owner/repo/토큰 입력 → "지금 백업" → 레포에 `study-log-backup.json` 커밋 생성(diff 확인). 데이터 바꾼 뒤 "복원"→확인→백업 시점으로 되돌아옴(대시보드 자동 갱신). 잘못된 토큰/repo는 toast 에러.
+  - **F4**: `git tag v2.0.0 && git push origin v2.0.0` → Actions 빌드 후 Release v2.0.0에 설치파일 첨부 확인.
+- ⚠️ 주의: 설치 후 첫 실행 경로가 바뀜 — `main`이 `visible:false`라 **반드시 setup의 조건부 show가 동작**해야 창이 뜬다(정상 실행 시). 자동 시작 등록은 **설치된 exe 경로** 기준이므로 dev가 아닌 설치 빌드에서 최종 확인.
 
 ### ✅ 단계 8 — 폴리시 & 패키징 (2026-07-18)
 **한 일**

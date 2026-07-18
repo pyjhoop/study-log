@@ -1,0 +1,54 @@
+name: release
+
+# 버전 태그(v*)를 push하면 Windows에서 빌드하고 GitHub Release에 설치파일을 첨부한다.
+# 수동 실행(workflow_dispatch)도 가능. (기획 F4)
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write # Release 생성/업로드에 필요
+
+jobs:
+  build:
+    # 앱이 Windows 전용(NSIS 타깃)이라 Windows 러너에서 빌드한다.
+    # CI 러너는 Smart App Control이 없어 로컬의 빌드 차단(os error 4551) 문제가 없다.
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Build app + create release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 코드 서명은 Not-V2. 서명을 붙일 때 아래 secrets를 채운다.
+          # TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          # TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          # 태그가 있으면 그 태그로, 수동 실행이면 앱 버전(__VERSION__)으로 릴리스한다.
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
+          releaseName: "학습기록 ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}"
+          releaseBody: "자동 빌드된 NSIS 설치파일입니다. (미서명 — 첫 실행 시 SmartScreen '추가 정보 → 실행')"
+          releaseDraft: false
+          prerelease: false
