@@ -301,3 +301,28 @@ export async function restoreBackup(config: BackupConfig, token: string): Promis
   await importData(payload);
   return payload;
 }
+
+// ── 자동 백업(세션 종료 시) ───────────────────────────────────────
+
+/** 자동 백업 동시 실행 방지 플래그. 세션이 연달아 끝나도 백업이 겹치지 않게 한다. */
+let autoBackupInFlight = false;
+
+/**
+ * 세션 종료 후 자동 백업(설정돼 있을 때만). 백그라운드 best-effort로 호출한다.
+ * - 미설정(`isConfigReady`=false)이면 조용히 무시하고 `null` 반환.
+ * - 이미 백업이 진행 중이면 겹치지 않게 `null` 반환.
+ * - 성공하면 백업 시각(epoch초)을 반환(`pushBackup`이 `last_backup_at`도 저장).
+ * 실패는 던지므로 호출부에서 잡아 조용히 처리할 것(반복 실패 알림 스팸 방지).
+ */
+export async function autoBackup(): Promise<number | null> {
+  const config = await getBackupConfig();
+  const token = await getToken();
+  if (!isConfigReady(config, token)) return null;
+  if (autoBackupInFlight) return null;
+  autoBackupInFlight = true;
+  try {
+    return await pushBackup(config, token);
+  } finally {
+    autoBackupInFlight = false;
+  }
+}

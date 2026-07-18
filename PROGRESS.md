@@ -27,6 +27,7 @@
 | 11 | **v3.1**: 대시보드 학습 잔디(GitHub 컨트리뷰션 히트맵) · v3.1.0 | ✅ 완료 |
 | 12 | **안정성 보강**(멀티에이전트 코드리뷰 후속): 데이터 유실·경합·견고성·통계 표시 오차 수정 | ✅ 완료 |
 | 13 | **자동 업데이트**: 시작 시 새 버전 확인 → 팝업 → 다운로드·설치·재시작(서명 검증) · v3.2.0 | ✅ 완료 |
+| 14 | **v4**: 세션 종료 시 GitHub 자동 백업(백그라운드·시스템 알림) · v4.0.0 | ✅ 완료 |
 
 - v2 기획: [`docs/03-v2-기능-기획.md`](./docs/03-v2-기능-기획.md)
 
@@ -51,6 +52,26 @@ npm run tauri build    # 배포 빌드 (단계 8)
 ---
 
 ## 단계별 완료 로그
+
+### ✅ 단계 14 — v4 (세션 종료 시 GitHub 자동 백업) (2026-07-18)
+버전 **3.2.0 → 4.0.0**(`tauri.conf.json`/`Cargo.toml`/`package.json`/사이드바).
+
+**배경**: GitHub 백업이 설정 화면 "지금 백업" 버튼으로만 동작하는 완전 수동이었음(`BackupSection`이 유일한 `pushBackup` 호출부). 세션을 끝낼 때마다 최신 데이터를 자동으로 백업하고 백그라운드 처리 후 간단히 알리도록 개선.
+
+**한 일**
+- **자동 백업**(`lib/backup.ts` `autoBackup()` 신설): 기존 `getBackupConfig`/`getToken`/`isConfigReady`/`pushBackup`을 조합만 함(새 IPC/플러그인 없음). 미설정이면 `null` 반환(무동작), **`autoBackupInFlight` 가드**로 연속 종료 시 백업 겹침 방지. 성공 시 `pushBackup`이 `last_backup_at`도 갱신.
+- **트리거**(`hooks/useSessionRecorder.ts`): 저장이 성공하는 **유일한 메인 창 지점**의 `record()`에서 `emitSessionSaved()` 직후 `void runAutoBackup()`을 **fire-and-forget**으로 붙임(저장 toast·통계 갱신 비차단). 성공 시 시스템 알림, **실패는 조용히 콘솔만**(오프라인 지속 시 매 세션 알림 스팸 방지). 복구 경로(`useLiveSessionGuard`)·수동 복원(`BackupSection`)은 `record()`를 거치지 않아 트리거 안 됨 — 정상 종료 경로만 백업(의도된 범위).
+- **알림 헬퍼**(`lib/notify.ts` 신설): `usePomodoro`가 쓰던 `@tauri-apps/plugin-notification` 패턴(권한 확인/요청 후 `sendNotification`, 실패 무시)을 재사용 헬퍼로 추출.
+- **권한**(`capabilities/main.json`): 메인 창에 notification 4종(`default`/`allow-notify`/`allow-is-permission-granted`/`allow-request-permission`) 추가. 플러그인은 Cargo/lib.rs에 이미 등록돼 있어 capability만 부여.
+- **결정 — 진행 중 통계 실시간 반영은 현행 유지**(코드 변경 없음): 대시보드 통계 위젯은 `useStats`→`fetchStatRows`로 **저장된 세션만** 쿼리하고 `session-saved`로만 갱신되는 기록성 뷰라, 아직 DB에 없는 진행 중 세션을 끼워 넣으면 의미가 애매하고(자정 넘김·뽀모도로 일시정지) 엣지케이스가 늘어남. 진행 중 실시간 피드백은 `LiveMeasure` 초시계가 담당하므로 저장 완료 시점에만 갱신하는 현재 설계 유지.
+
+**검증 결과**
+- `npm run build` ✅ (tsc + vite, 2276 모듈) · `cargo check` ✅ (`study-log v4.0.0`, main.json notification 권한 식별자 검증 통과, 에러 0).
+- ⏳ 런타임 E2E는 **사용자 테스트 대기** — `npm run tauri dev` 후:
+  - **설정된 경우**: 설정 "GitHub 백업"에 owner/repo/token 저장 → 측정 시작 후 **메인 창을 트레이로 숨긴 채** 핫키/오버레이로 종료 → ①"GitHub 백업 완료" 시스템 알림 ②백업 레포에 새 커밋(diff 확인) ③설정 "마지막 백업" 시각 갱신. 최초 백업 시 Windows 알림 권한 프롬프트 뜨면 허용.
+  - **미설정인 경우**: 백업 설정 비운 채 종료 → 알림·에러 없이 조용히(세션 저장 toast만).
+  - **연속 종료**: 짧은 세션 연달아 종료해도 백업 겹치지 않고 앱 정상.
+  - **오프라인/토큰 오류**: 세션 저장은 정상, 백업 실패는 알림·toast 없이 콘솔 에러만. 수동 백업은 설정 화면에서 여전히 가능.
 
 ### ✅ 단계 13 — 자동 업데이트 (2026-07-18)
 버전 **3.1.1 → 3.2.0**(신규 기능). 상세: [`docs/05-자동-업데이트.md`](./docs/05-자동-업데이트.md).
@@ -276,7 +297,7 @@ src/
   windows/                 # MainApp(대시보드/통계/기록/과목/설정/저장리스너/핫키등록/트레이툴팁) / TimerOverlay(옵션·뽀모도로 반영) / QuickStart(피커)
   hooks/{useSubjects,useSessions,useSession,useStats,useOverlayWindow,useOverlayOptions,usePomodoro,useSessionRecorder,useGlobalShortcuts,useTray}.ts
   #   과목/세션목록 / 측정상태구독 / 대시보드통계 / 오버레이 위치·크기 / 오버레이 옵션 구독 / 뽀모도로 컨트롤러(오버레이) / 종료→저장 / 전역핫키 등록·재등록 / 트레이 툴팁
-  lib/{utils,db,types,subjects,ipc,sessions,stats,time,settings,hotkeys,overlaySettings,pomodoro}.ts
+  lib/{utils,db,types,subjects,ipc,sessions,stats,time,settings,hotkeys,overlaySettings,pomodoro,backup,notify}.ts
   #   cn / DB / 타입 / 과목CRUD / invoke·event래퍼(+overlay-options-changed/hotkeys-changed) / 세션CRUD / 통계집계(+fetchTodaySec) / 시간 / settings K-V / 핫키 / 오버레이옵션 / 뽀모도로설정
   components/
     ui/{button,input,Switch,Modal,ConfirmDialog}.tsx

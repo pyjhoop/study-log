@@ -1,10 +1,27 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
+import { autoBackup } from "@/lib/backup";
 import { emitSessionSaved, onSessionFinished, takePendingFinished } from "@/lib/ipc";
+import { notify } from "@/lib/notify";
 import { saveSession, sessionExists } from "@/lib/sessions";
 import { getSubject } from "@/lib/subjects";
 import { formatHMS } from "@/lib/time";
 import type { SessionSummary } from "@/lib/types";
+
+/**
+ * 세션 저장 직후 GitHub 자동 백업(설정돼 있을 때만). 백그라운드 best-effort로 띄운다.
+ * 성공하면 시스템 알림, 실패는 조용히 콘솔만 남긴다(오프라인이 이어져도 매번 알림이 뜨지 않게).
+ */
+async function runAutoBackup() {
+  try {
+    const at = await autoBackup(); // 미설정이면 null → 아무 것도 안 함
+    if (at != null) {
+      void notify("GitHub 백업 완료", "학습 데이터를 GitHub에 백업했습니다.");
+    }
+  } catch (e) {
+    console.error("[recorder] 자동 백업 실패", e);
+  }
+}
 
 /**
  * 측정 종료(`session-finished`) 시 세션을 DB에 저장하는 단일 리스너.
@@ -36,6 +53,7 @@ export function useSessionRecorder() {
           const name = (await getSubject(summary.subject_id))?.name ?? "과목";
           toast.success(`세션 저장: ${name} · ${formatHMS(summary.duration_sec)}`);
           void emitSessionSaved(); // 대시보드 통계 새로고침 신호
+          void runAutoBackup(); // 백그라운드 자동 백업(비차단)
         }
       } catch (e) {
         toast.error(e instanceof Error ? e.message : String(e));
