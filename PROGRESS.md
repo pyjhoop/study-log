@@ -18,7 +18,7 @@
 | 2 | 측정 엔진 (Rust 상태/커맨드/이벤트) — 임시 버튼 검증 | ✅ 완료 |
 | 3 | 타이머 오버레이 창 (드래그·크기조절·숨김/표시·위치 복원) | ✅ 완료 |
 | 4 | 전역 핫키 + 빠른 시작 피커 | ✅ 완료 |
-| 5 | 세션 저장 + 기록 화면 | ⬜ |
+| 5 | 세션 저장 + 기록 화면 | ✅ 완료 |
 | 6 | 대시보드 통계 (일/주/월 + 오늘 목표 링) | ⬜ |
 | 7 | 부가기능: 뽀모도로/목표 → 트레이 → 오버레이 커스터마이즈 + 설정 화면 | ⬜ |
 | 8 | 폴리시 & 패키징 (빈 상태/에러, 아이콘, 빌드) | ⬜ |
@@ -44,6 +44,19 @@ npm run tauri build    # 배포 빌드 (단계 8)
 ---
 
 ## 단계별 완료 로그
+
+### ✅ 단계 5 — 세션 저장 + 기록 화면 (2026-07-18)
+**한 일**
+- **세션 저장 경로는 이미 완성**(단계 2·3): 측정 종료 → `session-finished` → `useSessionRecorder`(메인 창 단일 리스너)가 `saveSession`으로 INSERT. 이번 단계에서 `saveSession`이 인라인 `Date.now()` 대신 `time.ts`의 `nowSec()`를 쓰도록 정리(중복 제거), 나머지는 그대로.
+- **세션 데이터 계층 확장**(`lib/sessions.ts`): `listSessions`(과목 이름·색 JOIN, 최근순, `LIMIT ?`), `createSession`(수동 추가), `updateSession`(수정), `deleteSession`. **`duration_sec`는 저장 계층에서 파생**(`deriveDuration = max(0, ended-started-paused)`) — 프론트가 계산을 흘리지 않게. 전부 `?` 바인딩.
+- **타입**(`lib/types.ts`): `SessionWithSubject`(= Session + `subject_name`/`subject_color`), `SessionInput`(subject/시작/종료/paused/memo, duration 제외). 기존 `Session`의 "단계 5에서 사용" 주석 정리.
+- **시간 헬퍼**(`lib/time.ts`): `formatDurationKo`(초→"1시간 23분"), `formatDayLabel`("2026-07-18 (금)"), `formatClock`("14:05"), `toDatetimeLocal`/`fromDatetimeLocal`(epoch ↔ `datetime-local` 값, 로컬 tz). 모두 같은 기기 로컬 시계 기준.
+- **기록 화면**(`components/records/RecordsScreen.tsx` + `SessionEditor.tsx`, `hooks/useSessions.ts`): 세션을 **일별로 그룹핑**(날짜 헤더 + 그날 합계), 각 항목에 과목 색점·이름·시작~종료·공부시간 배지·메모. hover 시 수정/삭제 노출. **수동 추가**(우상단, 과목 없으면 비활성)와 **수정**은 같은 `SessionEditor` 모달(과목 select+보관 과목 포함, 시작/종료 `datetime-local`, 메모 textarea, 공부시간 실시간 미리보기, 종료≤시작 검증). 삭제는 `ConfirmDialog`. 빈 상태 2가지(과목 없음/기록 없음). 에러는 전부 toast.
+- **연결**: `MainApp`의 `records` 탭 플레이스홀더 → `<RecordsScreen/>`. (Rust·capabilities 변경 없음 — 조회는 `sql:default`, 쓰기는 이미 있는 `sql:allow-execute`로 충분.)
+
+**검증 결과**
+- `npm run build` ✅ (tsc + vite, 1614 모듈). Rust 변경 없어 `cargo check` 불필요.
+- ⏳ 런타임 E2E는 **사용자 테스트 대기** — `npm run tauri dev` 후 기록 탭에서: ①측정 시작→종료하면 기록 목록에 새 세션이 그날 그룹에 뜨는지 ②수동 추가(과목·시작/종료·메모)→목록 반영·공부시간 계산 ③수정(과목/시각/메모 바꾸면 시간 재계산) ④삭제(확인 후 사라짐) ⑤메모가 목록에 표시되는지 ⑥여러 날짜 세션이 날짜별로 그룹·합계 정확한지 ⑦과목 0개일 때 "수동 추가" 비활성 + 안내.
 
 ### ✅ 단계 4 — 전역 핫키 + 빠른 시작 피커 (2026-07-18)
 **한 일**
@@ -122,14 +135,15 @@ npm run tauri build    # 배포 빌드 (단계 8)
 src/
   main.tsx                 # window.label 분기 진입점
   index.css                # Tailwind + 테마 토큰
-  windows/                 # MainApp(대시보드=측정검증/과목/저장리스너/핫키등록) / TimerOverlay(완성) / QuickStart(피커 완성)
-  hooks/{useSubjects,useSession,useOverlayWindow,useSessionRecorder,useGlobalShortcuts}.ts
-  #   과목목록 / 측정상태구독 / 오버레이 위치·크기 / 종료→저장 리스너 / 전역핫키 등록(메인 창)
+  windows/                 # MainApp(대시보드=측정검증/기록/과목/저장리스너/핫키등록) / TimerOverlay(완성) / QuickStart(피커 완성)
+  hooks/{useSubjects,useSessions,useSession,useOverlayWindow,useSessionRecorder,useGlobalShortcuts}.ts
+  #   과목목록 / 세션목록 / 측정상태구독 / 오버레이 위치·크기 / 종료→저장 리스너 / 전역핫키 등록(메인 창)
   lib/{utils,db,types,subjects,ipc,sessions,time,settings,hotkeys}.ts
-  #   cn / DB연결 / 타입 / 과목CRUD / invoke·event래퍼(+showQuickstart/togglePause/focus-main) / 세션저장 / 경과계산 / settings K-V / 핫키 바인딩·기본값
+  #   cn / DB연결 / 타입 / 과목CRUD / invoke·event래퍼(+showQuickstart/togglePause/focus-main) / 세션 저장·조회·수정·삭제 / 경과·날짜·duration계산 / settings K-V / 핫키 바인딩·기본값
   components/
     ui/{button,input,Modal,ConfirmDialog}.tsx
     subjects/{SubjectsScreen,SubjectEditor}.tsx
+    records/{RecordsScreen,SessionEditor}.tsx   # 세션 일별 목록/수정/삭제/수동 추가·메모
     session/SessionTester.tsx          # 단계 2 임시 검증 패널(+오버레이 토글 버튼, 단계 6에서 대시보드로 대체)
 src-tauri/
   src/

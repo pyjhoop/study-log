@@ -4,6 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Toaster } from "sonner";
 import { cn } from "@/lib/utils";
 import { SubjectsScreen } from "@/components/subjects/SubjectsScreen";
+import { RecordsScreen } from "@/components/records/RecordsScreen";
 import { SessionTester } from "@/components/session/SessionTester";
 import { useSessionRecorder } from "@/hooks/useSessionRecorder";
 import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
@@ -99,6 +100,8 @@ export default function MainApp() {
         <section className="flex-1 overflow-auto p-6">
           {screen === "subjects" ? (
             <SubjectsScreen />
+          ) : screen === "records" ? (
+            <RecordsScreen />
           ) : screen === "dashboard" ? (
             <SessionTester />
           ) : (

@@ -20,7 +20,7 @@ export interface SubjectInput {
   color: string;
 }
 
-/** sessions 테이블 1행 (단계 5에서 본격 사용) */
+/** sessions 테이블 1행 */
 export interface Session {
   id: number;
   subject_id: number;
@@ -30,6 +30,27 @@ export interface Session {
   paused_sec: number;
   memo: string | null;
   created_at: number;
+}
+
+/**
+ * 세션 + 과목 이름/색(JOIN 결과). 기록 화면 목록에서 과목 표시에 쓴다.
+ * (과목 삭제는 세션이 있으면 막으므로 subject는 항상 존재한다.)
+ */
+export interface SessionWithSubject extends Session {
+  subject_name: string;
+  subject_color: string;
+}
+
+/**
+ * 세션 생성(수동 추가)/수정 입력. duration_sec는 저장 계층에서
+ * `ended_at - started_at - paused_sec`(하한 0)로 파생한다 → 입력에 포함하지 않는다.
+ */
+export interface SessionInput {
+  subject_id: number;
+  started_at: number;
+  ended_at: number;
+  paused_sec: number;
+  memo: string | null;
 }
 
 /** 측정 상태(Rust `Status` enum과 일치). */
