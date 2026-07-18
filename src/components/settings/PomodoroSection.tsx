@@ -18,7 +18,9 @@ export function PomodoroSection() {
   const [cfg, setCfg] = useState<PomodoroConfig>(DEFAULT_POMODORO);
 
   useEffect(() => {
-    void loadPomodoro().then(setCfg);
+    void loadPomodoro()
+      .then(setCfg)
+      .catch((e) => console.error("[PomodoroSection] 설정 로드 실패", e));
   }, []);
 
   const patch = async (next: Partial<PomodoroConfig>) => {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { onSessionSaved } from "@/lib/ipc";
 import { getSetting, setSetting } from "@/lib/settings";
 import { fetchStatRows, type StatRow } from "@/lib/stats";
@@ -54,11 +55,15 @@ export function useStats() {
     };
   }, [reload]);
 
-  /** 일일 목표(분) 저장 + 즉시 반영. */
+  /** 일일 목표(분) 저장 + 즉시 반영. 저장 실패 시 toast로 알린다(조용히 삼키지 않게). */
   const saveGoal = useCallback(async (min: number) => {
     const clamped = Math.max(0, Math.min(1440, Math.round(min)));
-    await setSetting(DAILY_GOAL_KEY, clamped);
-    setGoalMin(clamped);
+    try {
+      await setSetting(DAILY_GOAL_KEY, clamped);
+      setGoalMin(clamped);
+    } catch (e) {
+      toast.error(`목표 저장 실패: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }, []);
 
   return { rows, goalMin, loading, error, reload, saveGoal };

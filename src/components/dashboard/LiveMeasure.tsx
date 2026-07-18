@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
  */
 export function LiveMeasure() {
   const { status, subjectId, elapsedSec, start, pause, resume, stop } = useSession();
-  const { subjects, loading } = useSubjects();
+  const { subjects, loading, error: subjectsError } = useSubjects();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -68,7 +68,12 @@ export function LiveMeasure() {
       </div>
 
       {isIdle ? (
-        noSubjects ? (
+        subjectsError ? (
+          // 로드 실패를 "과목 없음" 빈 상태로 오인시키지 않도록 에러를 명시한다.
+          <p className="text-center text-xs text-destructive">
+            과목을 불러오지 못했어요: {subjectsError}
+          </p>
+        ) : noSubjects ? (
           <div className="flex flex-col items-center gap-2">
             <p className="text-center text-xs text-muted-foreground">
               측정하려면 먼저 과목을 만들어 주세요.

@@ -12,9 +12,11 @@ export function GoalSection() {
   const [goalMin, setGoalMin] = useState(DEFAULT_DAILY_GOAL_MIN);
 
   useEffect(() => {
-    void getSetting<number>(DAILY_GOAL_KEY).then((g) => {
-      if (typeof g === "number" && g > 0) setGoalMin(g);
-    });
+    void getSetting<number>(DAILY_GOAL_KEY)
+      .then((g) => {
+        if (typeof g === "number" && g > 0) setGoalMin(g);
+      })
+      .catch((e) => console.error("[GoalSection] 설정 로드 실패", e));
   }, []);
 
   const save = async (min: number) => {

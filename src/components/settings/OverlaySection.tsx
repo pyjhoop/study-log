@@ -29,7 +29,9 @@ export function OverlaySection() {
   const [opt, setOpt] = useState<OverlayOptions>(DEFAULT_OVERLAY_OPTIONS);
 
   useEffect(() => {
-    void loadOverlayOptions().then(setOpt);
+    void loadOverlayOptions()
+      .then(setOpt)
+      .catch((e) => console.error("[OverlaySection] 설정 로드 실패", e));
   }, []);
 
   const patch = async (next: Partial<OverlayOptions>) => {

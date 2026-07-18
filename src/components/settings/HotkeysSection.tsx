@@ -40,10 +40,12 @@ export function HotkeysSection() {
   const [saved, setSaved] = useState<HotkeyBindings>(DEFAULT_HOTKEYS);
 
   useEffect(() => {
-    void loadHotkeys().then((b) => {
-      setBinds(b);
-      setSaved(b);
-    });
+    void loadHotkeys()
+      .then((b) => {
+        setBinds(b);
+        setSaved(b);
+      })
+      .catch((e) => console.error("[HotkeysSection] 설정 로드 실패", e));
   }, []);
 
   const dirty = JSON.stringify(binds) !== JSON.stringify(saved);

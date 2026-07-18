@@ -21,7 +21,7 @@
 | 5 | 세션 저장 + 기록 화면 | ✅ 완료 |
 | 6 | 대시보드 통계 (일/주/월 + 오늘 목표 링) | ✅ 완료 |
 | 7 | 부가기능: 뽀모도로/목표 → 트레이 → 오버레이 커스터마이즈 + 설정 화면 | ✅ 완료 |
-| 8 | 폴리시 & 패키징 (빈 상태/에러, 아이콘, 빌드) | ⬜ |
+| 8 | 폴리시 & 패키징 (빈 상태/에러, 아이콘, 빌드) | ✅ 완료 |
 
 ---
 
@@ -44,6 +44,20 @@ npm run tauri build    # 배포 빌드 (단계 8)
 ---
 
 ## 단계별 완료 로그
+
+### ✅ 단계 8 — 폴리시 & 패키징 (2026-07-18)
+**한 일**
+- **전역 ErrorBoundary**(`components/ErrorBoundary.tsx`): 렌더 중 던져진 예외를 잡아 흰 화면(WSOD) 대신 복구 카드(안내 + 에러 메시지 + "새로고침")를 보여준다. **main 창만** 카드 표시, 투명·소형 창(timer/quickstart)은 방해 안 되게 `null` 렌더. `main.tsx`에서 `<ErrorBoundary label={label}>`로 `Root` 감쌈 + `window`에 `unhandledrejection`/`error` 리스너로 미처리 비동기 예외를 콘솔에 남김(조용히 사라지지 않게). 사용자 대면 에러는 여전히 각 화면 try/catch→toast, 이 그물은 최후 방어선.
+- **빈 상태/에러 폴리시 보완**(Explore 점검 후 3곳): ①`useStats.saveGoal`에 try/catch+toast 추가 — 대시보드 목표 링 저장 실패가 무반응이던 것 수정(설정 화면 경로와 처리 일치). ②`LiveMeasure` — `useSubjects.error`를 무시해 과목 로드 실패가 "과목 없음" 빈 상태로 위장되던 것 수정(에러 메시지 명시 분기). ③설정 4섹션(Goal/Pomodoro/Overlay/Hotkeys) 로드-온-마운트 `.then`에 `.catch(console.error)` 추가 — 조용히 기본값으로 떨어지던 로드 실패를 콘솔에 기록. (나머지 화면은 빈 상태·toast 이미 일관.)
+- **버전 1.0.0 승격**: `tauri.conf.json`/`Cargo.toml`/`package.json`/사이드바 표기 모두 `1.0.0`. V1 기획 전 단계 완료 기념 첫 정식 릴리스.
+- **아이콘**: 이미 앱 테마(teal/orange) 커스텀 아이콘으로 교체되어 있음(스캐폴딩 시 반영). 별도 작업 불필요.
+- **패키징**: `bundle.targets`를 `"all"`→`["nsis"]`로 변경. WiX(MSI) `light.exe`가 **한글 productName("학습기록")** 에서 실패해, 유니코드 이름을 잘 처리하는 **NSIS 설치파일**만 생성하도록 고정. 산출물 `src-tauri/target/release/bundle/nsis/학습기록_1.0.0_x64-setup.exe`(≈3.2MB) → GitHub 릴리스 **v1.0.0** 업로드.
+
+**검증 결과**
+- `npm run build` ✅ (tsc + vite, 2257 모듈) · `npm run tauri build` ✅ (NSIS 설치파일 생성).
+- 참고: NSIS 첫 빌드 시 `nsis_tauri_utils.dll` 플러그인 다운로드에서 일시적 `os error 5(액세스 거부)`가 날 수 있음 → **재시도하면 통과**(툴체인 캐시 후). WiX MSI는 한글 이름 이슈로 비활성.
+- ⚠️ 미서명 빌드라 첫 실행 시 Windows SmartScreen "알 수 없는 게시자" 경고(추가 정보→실행). 코드 서명은 Not-V1(docs/01 §7).
+- ⏳ 런타임 E2E는 **사용자 테스트 대기** — 설치파일로 설치 후: 앱 실행·측정·기록·통계·설정 전반 동작, 재실행 후 데이터 유지.
 
 ### ✅ 단계 7 — 부가기능(뽀모도로 · 트레이 · 오버레이 커스터마이즈 · 설정 화면) (2026-07-18)
 **한 일**
