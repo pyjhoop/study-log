@@ -31,3 +31,31 @@ export interface Session {
   memo: string | null;
   created_at: number;
 }
+
+/** 측정 상태(Rust `Status` enum과 일치). */
+export type SessionStatus = "idle" | "running" | "paused";
+
+/**
+ * 측정 상태 스냅샷. Rust가 단일 소스로 들고 `session-changed`로 브로드캐스트하며,
+ * `get_session_state`의 응답 타입이기도 하다(Rust `SessionSnapshot`과 필드 일치).
+ */
+export interface SessionSnapshot {
+  status: SessionStatus;
+  subject_id: number | null;
+  started_at: number | null;
+  accumulated_paused_sec: number;
+  paused_at: number | null;
+  /** 스냅샷 시점의 공부 경과 시간(초). */
+  elapsed_sec: number;
+  /** 스냅샷을 만든 Rust 기준 시각(epoch sec). */
+  server_now: number;
+}
+
+/** 측정 종료 요약(Rust `SessionSummary`). 세션 저장(INSERT)의 입력이 된다. */
+export interface SessionSummary {
+  subject_id: number;
+  started_at: number;
+  ended_at: number;
+  duration_sec: number;
+  paused_sec: number;
+}

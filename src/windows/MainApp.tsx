@@ -3,6 +3,7 @@ import { LayoutDashboard, ListChecks, BookOpen, Settings } from "lucide-react";
 import { Toaster } from "sonner";
 import { cn } from "@/lib/utils";
 import { SubjectsScreen } from "@/components/subjects/SubjectsScreen";
+import { SessionTester } from "@/components/session/SessionTester";
 
 type Screen = "dashboard" | "records" | "subjects" | "settings";
 
@@ -60,6 +61,8 @@ export default function MainApp() {
         <section className="flex-1 overflow-auto p-6">
           {screen === "subjects" ? (
             <SubjectsScreen />
+          ) : screen === "dashboard" ? (
+            <SessionTester />
           ) : (
             <div className="flex h-full items-center justify-center rounded-xl border border-dashed">
               <div className="max-w-md text-center">

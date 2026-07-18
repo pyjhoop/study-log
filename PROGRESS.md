@@ -15,7 +15,7 @@
 |------|------|------|
 | 0 | 스캐폴딩 (Tauri v2 + React/TS + Tailwind + shadcn/ui, 3-창, capabilities 골격) | ✅ 완료 |
 | 1 | DB 계층(tauri-plugin-sql + 마이그레이션) + 과목 CRUD/관리 화면 | ✅ 완료 |
-| 2 | 측정 엔진 (Rust 상태/커맨드/이벤트) — 임시 버튼 검증 | ⬜ |
+| 2 | 측정 엔진 (Rust 상태/커맨드/이벤트) — 임시 버튼 검증 | ✅ 완료 |
 | 3 | 타이머 오버레이 창 (드래그·크기조절·숨김/표시·위치 복원) | ⬜ |
 | 4 | 전역 핫키 + 빠른 시작 피커 | ⬜ |
 | 5 | 세션 저장 + 기록 화면 | ⬜ |
@@ -44,6 +44,19 @@ npm run tauri build    # 배포 빌드 (단계 8)
 ---
 
 ## 단계별 완료 로그
+
+### ✅ 단계 2 — 측정 엔진 (Rust 상태/커맨드/이벤트) (2026-07-18)
+**한 일**
+- **Rust 상태 단일 소스**: `src-tauri/src/state.rs` — `Status`(Idle/Running/Paused) enum, `Measurement` 구조체(기획서 §5-1 필드 그대로), `elapsed(now)`(일시정지 제외 경과 계산 §5-3), 직렬화용 `SessionSnapshot`(원시 필드 + `elapsed_sec`/`server_now`), 종료 요약 `SessionSummary`. `now_epoch()`는 `SystemTime` 사용(chrono 미도입).
+- **커맨드 5종**: `src-tauri/src/commands.rs` — `start_session(subject_id)`/`pause_session`/`resume_session`/`stop_session`/`get_session_state`. 전부 `Result<T, String>`, 잘못된 상태 전이는 한글 에러로 거절. 상태 변경 후 `emit("session-changed", snapshot)`으로 전 창 브로드캐스트(락 drop 후 emit). `stop_session`은 요약만 반환하고 Idle로 리셋 — **세션 INSERT는 메인 창 JS가 수행**(§5-2).
+- **등록**: `lib.rs`에 `mod state/commands`, `.manage(Mutex::new(Measurement::idle()))`, `invoke_handler(generate_handler![...])`. (커스텀 앱 커맨드는 capabilities 권한 불필요, 이벤트는 기존 `core:default`로 충분 → capabilities 변경 없음.)
+- **프론트 IPC 계층**: `lib/ipc.ts`(invoke/listen 래퍼 + `EVENT_SESSION_CHANGED`), `lib/time.ts`(`computeElapsed`/`formatHMS`/`nowSec` — 오버레이 재사용), `lib/sessions.ts`(`saveSession` — duration 0이면 저장 skip), `lib/types.ts`에 `SessionStatus`/`SessionSnapshot`/`SessionSummary` 추가.
+- **구독 훅 + 검증 UI**: `hooks/useSession.ts`(마운트 시 `get_session_state` 복구 → `session-changed` 구독 → Running 중 1초 틱으로 `elapsedSec`만 재계산). `components/session/SessionTester.tsx`(과목 선택→시작, 일시정지/재개, 종료→DB 저장+toast, 상태 배지, 라이브 `HH:MM:SS`). `MainApp` **대시보드 탭**에 임시 연결.
+
+**검증 결과**
+- `cargo check` ✅ (경고·에러 0)
+- `npm run build` ✅ (tsc 타입체크 + vite 번들 통과)
+- ⏳ 런타임 E2E는 **사용자 테스트 대기** — `npm run tauri dev` 후 대시보드 탭에서: 과목 선택→시작(시간 흐름), 일시정지(멈춤)→재개(정지분 제외하고 이어짐), 종료→"세션 저장" toast, **측정 중 새로고침(F5)해도 상태·경과시간 복구**(=Rust 단일 소스), 기록 저장은 단계 5 기록 화면에서 최종 확인(현재는 DB에 INSERT까지).
 
 ### ✅ 단계 1 — DB 계층 + 과목 관리 화면 (2026-07-18)
 **한 일**
@@ -81,14 +94,21 @@ npm run tauri build    # 배포 빌드 (단계 8)
 src/
   main.tsx                 # window.label 분기 진입점
   index.css                # Tailwind + 테마 토큰
-  windows/                 # MainApp(과목 화면 연결) / TimerOverlay / QuickStart
-  hooks/useSubjects.ts     # 과목 목록 로드 훅
-  lib/{utils,db,types,subjects}.ts   # cn() / DB 연결 / 타입 / 과목 CRUD
+  windows/                 # MainApp(대시보드=측정검증 / 과목 화면 연결) / TimerOverlay / QuickStart
+  hooks/{useSubjects,useSession}.ts   # 과목 목록 / 측정 상태 구독 훅
+  lib/{utils,db,types,subjects,ipc,sessions,time}.ts
+  #   cn / DB연결 / 타입 / 과목CRUD / invoke·event래퍼 / 세션저장 / 경과계산·포맷
   components/
     ui/{button,input,Modal,ConfirmDialog}.tsx
     subjects/{SubjectsScreen,SubjectEditor}.tsx
+    session/SessionTester.tsx          # 단계 2 임시 검증 패널(단계 3·6에서 오버레이/대시보드로 대체)
 src-tauri/
-  src/{lib.rs, main.rs}    # 플러그인 초기화 + 마이그레이션 등록 (commands.rs/state.rs/tray.rs는 단계 2·7)
+  src/
+    lib.rs                 # 플러그인 초기화 + 마이그레이션 + manage(상태) + invoke_handler
+    main.rs
+    state.rs               # Measurement(측정 상태 단일 소스) + Status + 스냅샷/요약
+    commands.rs            # start/pause/resume/stop/get_session_state (+ session-changed emit)
+                           # (tray.rs는 단계 7)
   migrations/0001_init.sql # subjects/sessions/settings
   capabilities/{main,timer,quickstart}.json   # main에 sql:allow-execute 추가됨
   tauri.conf.json          # 3-창 + productName/identifier
@@ -97,7 +117,6 @@ docs/                      # 기획/결정 문서
 PROGRESS.md                # (이 문서)
 CLAUDE.md                  # 개발 가이드·규약
 ```
-※ `lib/ipc.ts`(invoke 래퍼)는 단계 2(측정 커맨드)에서 생성.
 
 ---
 

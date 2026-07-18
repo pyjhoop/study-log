@@ -1,4 +1,11 @@
+use std::sync::Mutex;
+
 use tauri_plugin_sql::{Migration, MigrationKind};
+
+mod commands;
+mod state;
+
+use state::Measurement;
 
 /// SQLite 연결 문자열. 프론트(`src/lib/db.ts`)의 `Database.load` 인자와 반드시 일치해야 한다.
 const DB_URL: &str = "sqlite:studylog.db";
@@ -16,6 +23,8 @@ fn migrations() -> Vec<Migration> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default()
+        // 측정 상태 단일 소스. 커맨드에서 `State<Mutex<Measurement>>`로 주입받는다.
+        .manage(Mutex::new(Measurement::idle()))
         .plugin(tauri_plugin_opener::init())
         .plugin(
             tauri_plugin_sql::Builder::new()
@@ -30,6 +39,13 @@ pub fn run() {
     }
 
     builder
+        .invoke_handler(tauri::generate_handler![
+            commands::start_session,
+            commands::pause_session,
+            commands::resume_session,
+            commands::stop_session,
+            commands::get_session_state,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
