@@ -10,6 +10,7 @@ import {
   type OverlayOptions,
   type OverlayShowItems,
 } from "@/lib/overlaySettings";
+import { OVERLAY_VARIANTS, OverlayVariantView, type OverlayViewModel } from "@/components/overlay";
 import { cn } from "@/lib/utils";
 import { Section, Row, NumberField } from "./parts";
 
@@ -47,6 +48,32 @@ export function OverlaySection() {
   const patchShow = (key: keyof OverlayShowItems, v: boolean) =>
     void patch({ show: { ...opt.show, [key]: v } });
 
+  // 미리보기용 샘플 뷰모델(색·투명도·표시항목은 실제 옵션 반영, 크기는 미리보기 고정).
+  const previewVm: OverlayViewModel = {
+    timeStr: "00:25:00",
+    subline:
+      [opt.show.subject && "영어", opt.show.goalPct && "목표 60%"].filter(Boolean).join(" · ") || "",
+    timeColor: opt.textColor,
+    dotColor: "#10b981",
+    textColor: opt.textColor,
+    bg: hexToRgba(opt.bgColor, opt.bgOpacity),
+    fontSize: "18px",
+    fontSizeBig: "30px",
+    showDot: opt.show.dot,
+    showTime: opt.show.time,
+    isPaused: false,
+    isBreak: false,
+    progressPct: 60,
+    pomo: {
+      active: opt.variant === "pomodoro",
+      phase: "focus",
+      breakKind: "short",
+      cycle: 1,
+      remainingSec: 1500,
+      label: "집중 1",
+    },
+  };
+
   return (
     <Section
       icon={MonitorSmartphone}
@@ -63,34 +90,31 @@ export function OverlaySection() {
         </div>
       }
     >
-      {/* 미리보기 */}
-      <div className="flex justify-center rounded-lg border bg-[repeating-conic-gradient(#e5e7eb_0_25%,transparent_0_50%)] bg-[length:16px_16px] p-4 dark:bg-[repeating-conic-gradient(#3f3f46_0_25%,transparent_0_50%)]">
-        <div
-          className="flex items-center gap-2 rounded-xl px-3 py-2 backdrop-blur-sm"
-          style={{ backgroundColor: hexToRgba(opt.bgColor, opt.bgOpacity) }}
-        >
-          {opt.show.dot && <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />}
-          <div className="flex flex-col leading-none">
-            {opt.show.time && (
-              <span
-                className="font-mono font-semibold tabular-nums"
-                style={{
-                  color: opt.textColor,
-                  fontSize: opt.fontMode === "fixed" ? `${opt.fontSizePx}px` : "20px",
-                }}
-              >
-                00:25:00
-              </span>
-            )}
-            <span
-              className="mt-0.5 text-[10px]"
-              style={{ color: opt.textColor, opacity: 0.7 }}
+      {/* 레이아웃(variant) 선택 */}
+      <div>
+        <p className="mb-2 text-xs font-medium text-muted-foreground">레이아웃</p>
+        <div className="flex flex-wrap gap-1.5">
+          {OVERLAY_VARIANTS.map(({ id, label }) => (
+            <button
+              key={id}
+              onClick={() => void patch({ variant: id })}
+              className={cn(
+                "rounded-md border px-2.5 py-1 text-xs transition-colors",
+                opt.variant === id
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "hover:bg-accent hover:text-accent-foreground",
+              )}
             >
-              {[opt.show.subject && "영어", opt.show.goalPct && "목표 60%"]
-                .filter(Boolean)
-                .join(" · ") || " "}
-            </span>
-          </div>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 미리보기 (선택된 variant 실제 렌더) */}
+      <div className="flex justify-center rounded-lg border bg-[repeating-conic-gradient(#e5e7eb_0_25%,transparent_0_50%)] bg-[length:16px_16px] p-4 dark:bg-[repeating-conic-gradient(#3f3f46_0_25%,transparent_0_50%)]">
+        <div className="relative h-20 w-56 overflow-hidden rounded-xl">
+          <OverlayVariantView variant={opt.variant} vm={previewVm} />
         </div>
       </div>
 

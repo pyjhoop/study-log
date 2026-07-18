@@ -12,18 +12,18 @@ import { fetchTodaySec } from "@/lib/stats";
 import { DAILY_GOAL_KEY, DEFAULT_DAILY_GOAL_MIN } from "@/hooks/useStats";
 import { hexToRgba } from "@/lib/overlaySettings";
 import { formatHMS } from "@/lib/time";
-import { cn } from "@/lib/utils";
+import { OverlayVariantView } from "@/components/overlay";
+import type { OverlayViewModel } from "@/components/overlay";
 import type { Subject } from "@/lib/types";
 
 const PAUSED_COLOR = "#f59e0b"; // amber
 const BREAK_COLOR = "#38bdf8"; // sky
 
 /**
- * 타이머 오버레이 창(기획서 §8·10). 항상-위·테두리 없는 작은 알약.
- *  - 표시: 경과 시간(또는 뽀모도로 남은 시간) + 과목 색점/이름/목표% — 설정(오버레이 커스터마이즈)으로 토글.
- *  - 외형: 배경색/투명도·글자색·글자크기·항상위를 설정에서 즉시 반영(useOverlayOptions).
- *  - 뽀모도로: 켜져 있으면 남은 시간 카운트다운 + 사이클(집중N/휴식) 표시, 전환은 usePomodoro가 담당.
- *  - 이동/크기조절/미니 컨트롤/위치 복원은 단계 3과 동일.
+ * 타이머 오버레이 창(기획서 §8·10). 항상-위·테두리 없는 작은 창.
+ *  - 이 컴포넌트는 **공유 데이터 계산 + 공유 크롬**(드래그 영역·미니 컨트롤·리사이즈 그립·항상위)을 담당하고,
+ *    실제 레이아웃은 선택된 variant 컴포넌트(`components/overlay`)에 위임한다(알약/디지털/미니멀/링/막대/뽀모도로).
+ *  - 색·투명도·글자·표시항목 옵션은 모든 variant가 공유한다(useOverlayOptions).
  * 표시/숨김 자체는 Rust가 측정 시작/종료 시 자동 처리한다.
  */
 export default function TimerOverlay() {
@@ -61,11 +61,12 @@ export default function TimerOverlay() {
     void getCurrentWindow().setAlwaysOnTop(options.alwaysOnTop).catch(() => {});
   }, [options.alwaysOnTop]);
 
-  // 목표% 표시가 켜진 경우에만 오늘 누적·목표를 로드(세션 저장 시 갱신).
+  // 목표% 또는 링/막대 variant일 때 오늘 누적·목표를 로드(세션 저장 시 갱신).
+  const needGoal = options.show.goalPct || options.variant === "ring" || options.variant === "bar";
   const [todaySec, setTodaySec] = useState(0);
   const [goalMin, setGoalMin] = useState(DEFAULT_DAILY_GOAL_MIN);
   useEffect(() => {
-    if (!options.show.goalPct) return;
+    if (!needGoal) return;
     let unlisten: (() => void) | undefined;
     let cancelled = false;
     const load = () => {
@@ -85,7 +86,7 @@ export default function TimerOverlay() {
       cancelled = true;
       unlisten?.();
     };
-  }, [options.show.goalPct]);
+  }, [needGoal]);
 
   const isPaused = status === "paused";
   const isBreak = pomo.active && pomo.phase === "break";
@@ -104,15 +105,38 @@ export default function TimerOverlay() {
   else if (isPaused && options.show.pausedBadge) parts.push("일시정지");
   if (options.show.subject && subject) parts.push(subject.name);
   const goalSec = goalMin * 60;
+  const curSec = todaySec + (status !== "idle" ? elapsedSec : 0);
+  const progressPct = needGoal && goalSec > 0 ? (curSec / goalSec) * 100 : null;
   if (options.show.goalPct && goalSec > 0) {
-    const cur = todaySec + (status !== "idle" ? elapsedSec : 0);
-    parts.push(`목표 ${Math.round((cur / goalSec) * 100)}%`);
+    parts.push(`목표 ${Math.round((curSec / goalSec) * 100)}%`);
   }
   const subline = parts.join(" · ");
 
   // 시간 문자열: 뽀모도로면 남은 시간, 아니면 경과 시간.
   const timeStr = formatHMS(pomo.active ? pomo.remainingSec : elapsedSec);
-  const fontSize = options.fontMode === "fixed" ? `${options.fontSizePx}px` : "clamp(15px, 42vh, 44px)";
+  const fontSize =
+    options.fontMode === "fixed" ? `${options.fontSizePx}px` : "clamp(15px, 42vh, 44px)";
+  const fontSizeBig =
+    options.fontMode === "fixed"
+      ? `${Math.round(options.fontSizePx * 1.6)}px`
+      : "clamp(20px, 60vh, 96px)";
+
+  const vm: OverlayViewModel = {
+    timeStr,
+    subline,
+    timeColor,
+    dotColor,
+    textColor: options.textColor,
+    bg: hexToRgba(options.bgColor, options.bgOpacity),
+    fontSize,
+    fontSizeBig,
+    showDot: options.show.dot,
+    showTime: options.show.time,
+    isPaused,
+    isBreak,
+    progressPct,
+    pomo,
+  };
 
   const handleResizeGrip = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -124,44 +148,15 @@ export default function TimerOverlay() {
     <div className="h-screen w-screen select-none">
       <div
         data-tauri-drag-region
-        className="group relative flex h-full w-full items-center gap-2 overflow-hidden rounded-xl px-3 backdrop-blur-sm transition-colors"
-        style={{ backgroundColor: hexToRgba(options.bgColor, options.bgOpacity) }}
+        className="group relative h-full w-full overflow-hidden rounded-xl transition-colors"
       >
-        {/* 과목 색점 (일시정지/휴식 시 상태색 + 깜빡임) */}
-        {options.show.dot && (
-          <span
-            className={cn(
-              "pointer-events-none h-2.5 w-2.5 shrink-0 rounded-full",
-              (isPaused || isBreak) && "animate-pulse",
-            )}
-            style={{ backgroundColor: dotColor }}
-          />
-        )}
-
-        {/* 시간 + 서브라인 (드래그가 잡히도록 pointer-events 차단) */}
-        <div className="pointer-events-none flex min-w-0 flex-1 flex-col leading-none">
-          {options.show.time && (
-            <span
-              className="font-mono font-semibold tabular-nums"
-              style={{ fontSize, color: timeColor }}
-            >
-              {timeStr}
-            </span>
-          )}
-          {subline && (
-            <span
-              className="mt-0.5 truncate text-[10px]"
-              style={{ color: options.textColor, opacity: 0.7 }}
-            >
-              {subline}
-            </span>
-          )}
-        </div>
+        {/* variant별 콘텐츠(드래그가 잡히도록 내부는 pointer-events-none) */}
+        <OverlayVariantView variant={options.variant} vm={vm} />
 
         {/* 미니 컨트롤 (마우스 오버 시에만) */}
         <div
           onMouseDown={(e) => e.stopPropagation()}
-          className="pointer-events-auto ml-auto flex shrink-0 items-center gap-1 pl-1 opacity-0 transition-opacity group-hover:opacity-100"
+          className="pointer-events-auto absolute right-1.5 top-1/2 flex -translate-y-1/2 shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100"
         >
           {isPaused ? (
             <OverlayButton title="재개" onClick={() => void resumeSession().catch(() => {})}>

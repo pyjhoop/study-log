@@ -23,6 +23,7 @@
 | 7 | 부가기능: 뽀모도로/목표 → 트레이 → 오버레이 커스터마이즈 + 설정 화면 | ✅ 완료 |
 | 8 | 폴리시 & 패키징 (빈 상태/에러, 아이콘, 빌드) | ✅ 완료 |
 | 9 | **v2**: 비정상 종료 세션 자동 복구 · Windows 자동 시작 · GitHub 백업/복원 · Actions 릴리스 자동화 | ✅ 완료 |
+| 10 | **v3**: 오버레이 레이아웃(variant) 6종 · 에셋 파일명 영문화(productName) · v3.0.0 | ✅ 완료 |
 
 - v2 기획: [`docs/03-v2-기능-기획.md`](./docs/03-v2-기능-기획.md)
 
@@ -47,6 +48,22 @@ npm run tauri build    # 배포 빌드 (단계 8)
 ---
 
 ## 단계별 완료 로그
+
+### ✅ 단계 10 — v3 (오버레이 레이아웃 6종 · 파일명 영문화 · v3.0.0) (2026-07-18)
+**기획**: [`plans/v3`]. 버전 **2.0.0 → 3.0.0**.
+
+**한 일**
+- **오버레이 레이아웃(variant) 6종**(순수 프론트, Rust/capabilities 변경 없음): 기존 단일 알약 레이아웃을 **선택 가능한 variant 6종**으로 확장 — `pill`(알약, 기존) / `digital`(큰 디지털 시계) / `minimal`(배경 없이 시간만+text-shadow) / `ring`(목표 진행 원형 링+가운데 시간) / `bar`(하단 목표 진행 막대) / `pomodoro`(사이클 라벨+남은시간, 뽀모도로 꺼지면 경과시간 폴백). **색·투명도·글자·표시항목 옵션은 그대로 공유**하고 배치/모양만 교체.
+  - `lib/overlaySettings.ts`: `OverlayOptions`에 `variant` 필드(+`OverlayVariantId` 타입), 기본 `"pill"`. `loadOverlayOptions`의 기존 spread 병합으로 누락 자동 보정.
+  - **리팩터** `windows/TimerOverlay.tsx`: 데이터 계산(시간/서브라인/색/과목/뽀모도로/**목표 진행률**)을 `OverlayViewModel`로 묶어 variant에 위임. 드래그 영역·마우스오버 미니 컨트롤(재개/일시정지/종료)·리사이즈 그립·항상위는 **공용 크롬**으로 래퍼에 유지. 목표% 로드 조건을 `show.goalPct || variant∈{ring,bar}`로 확장(링/막대는 진행률이 핵심).
+  - 신규 `components/overlay/`: `types.ts`(뷰모델), `index.tsx`(레지스트리+`OverlayVariantView` 스위처), `{Pill,Digital,Minimal,Ring,Bar,Pomodoro}Variant.tsx`. 링은 대시보드 `GoalRing`의 SVG 패턴을 viewBox로 축약해 창 크기에 스케일.
+  - **설정**(`components/settings/OverlaySection.tsx`): 상단에 **레이아웃 선택 버튼 6개**(선택 강조), 미리보기를 **선택 variant 실제 렌더**(샘플 뷰모델)로 교체해 WYSIWYG. 색/투명도/표시항목 컨트롤은 그대로. 변경은 기존대로 즉시 저장+`overlay-options-changed`로 타이머 창 실시간 전환.
+- **에셋 파일명 영문화**: `tauri.conf.json` `productName` **"학습기록" → "StudyLog"**. 릴리스 산출물이 `StudyLog_3.0.0_x64-setup.exe`가 되도록(v2에서 한글 productName 탓에 파일명 앞이 비던 문제 해결). 창 제목·사이드바 h1은 한글 유지, identifier(`com.studylog.app`) 불변 → **데이터 경로/기존 데이터 보존**. 설치 시 시작메뉴/폴더는 "StudyLog"(영문).
+- **버전 3.0.0**: `tauri.conf.json`/`Cargo.toml`/`package.json`/사이드바.
+
+**검증 결과**
+- `npm run build` ✅ (tsc + vite, 2270 모듈) · `cargo check` ✅ (`study-log v3.0.0`, 에러 0).
+- ⏳ 런타임 E2E는 **사용자 테스트 대기** — `npm run tauri dev` 후: 측정 시작→오버레이 표시, 설정 "오버레이"에서 레이아웃 6종을 바꿀 때 타이머 창이 **즉시** 전환(디지털/미니멀/링/막대/뽀모도로), 각 레이아웃에서 드래그·리사이즈·마우스오버 컨트롤·색/투명도/표시항목·목표% 정확. 재시작 시 선택 레이아웃 복원. `npm run tauri build` 산출물 파일명이 `StudyLog_3.0.0_x64-setup.exe`인지.
 
 ### ✅ 단계 9 — v2 (자동복구 · 자동시작 · GitHub 백업/복원 · 릴리스 자동화) (2026-07-18)
 **기획**: [`docs/03-v2-기능-기획.md`](./docs/03-v2-기능-기획.md) (F1~F4). 버전 **1.0.0 → 2.0.0** 승격(`tauri.conf.json`/`Cargo.toml`/`package.json`/사이드바).

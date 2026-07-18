@@ -19,7 +19,12 @@ export interface OverlayShowItems {
   pausedBadge: boolean;
 }
 
+/** 오버레이 레이아웃 종류(색·투명도·표시항목 옵션은 공유하고 배치/모양만 다르다). */
+export type OverlayVariantId = "pill" | "digital" | "minimal" | "ring" | "bar" | "pomodoro";
+
 export interface OverlayOptions {
+  /** 레이아웃 종류. */
+  variant: OverlayVariantId;
   /** 배경 불투명도 0~100(%). */
   bgOpacity: number;
   /** 배경 기준 색(hex). 실제 알파는 bgOpacity로. */
@@ -38,6 +43,7 @@ export interface OverlayOptions {
 
 /** 기본 옵션 — 현재(단계 3) 오버레이 외형과 동일하게 맞춘다. */
 export const DEFAULT_OVERLAY_OPTIONS: OverlayOptions = {
+  variant: "pill",
   bgOpacity: 70,
   bgColor: "#000000",
   textColor: "#ffffff",

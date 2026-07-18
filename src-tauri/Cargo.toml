@@ -1,6 +1,6 @@
 [package]
 name = "study-log"
-version = "2.0.0"
+version = "3.0.0"
 description = "학습기록 - 개인용 학습 시간 측정·통계 데스크톱 앱"
 authors = ["pyjhoop"]
 edition = "2021"
