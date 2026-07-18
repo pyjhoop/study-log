@@ -67,11 +67,15 @@ npm run tauri build    # 배포 빌드 (단계 8)
 - **권한**(`capabilities/main.json`): 기존 http 스코프(api.github.com)에 **`https://api.web3forms.com/*`** 추가(최소 스코프 유지, 와일드카드 아님).
 - **버전 4.1.0**: `tauri.conf.json`/`Cargo.toml`/`package.json`/사이드바.
 
-**⚠️ 배포 전 필수**: `src/lib/support.ts`의 `WEB3FORMS_ACCESS_KEY`를 web3forms.com에서 발급한 실제 키(UUID)로 교체. 미교체면 문의 화면에 노란 경고 배너가 뜨고 전송이 막힘.
+**운영 메모(Web3Forms)**
+- **수신 이메일**: pyjhoop1@gmail.com(가입 시 등록). access key는 `src/lib/support.ts`에 상수로 있고 실제 값 적용 완료(`9500b361-…`).
+- **키는 공개용**(클라이언트 임베드 설계) — 리포/번들에 노출돼도 데이터·계정 피해 없음. 유일한 리스크는 **스팸**(누가 키로 반복 전송). 스팸 발생 시 web3forms.com에서 **새 키 발급 → 상수 교체**로 즉시 무력화(로테이션).
+- **무료 한도 250건/월**.
+- ⚠️ web3forms 설정에서 **"Domain Restriction"을 켜지 말 것** — Tauri 요청 출처가 `tauri://localhost`라 실제 웹도메인 제한을 걸면 앱 문의가 전부 차단됨.
 
 **검증 결과**
 - `npm run build` ✅ (tsc + vite, 2279 모듈) · `cargo check` ✅ (`study-log v4.1.0`, web3forms http 스코프 검증 통과, 에러 0).
-- ⏳ 런타임 E2E는 **사용자 테스트 대기** — access key 교체 후 `npm run tauri dev`: 문의 탭에서 유형·제목·내용 작성→보내기→성공 toast, 개발자 이메일 수신 확인(앱버전·환경 포함), 이메일 채우면 답장 가능·비우면 익명, 잘못된 이메일 형식 차단, 오프라인 시 에러 toast.
+- ✅ 런타임 E2E **사용자 확인 완료**(2026-07-18) — 실제 access key(`9500b361-…`) 적용 후 문의 탭에서 전송 → 개발자 이메일 정상 수신.
 
 ### ✅ 단계 15 — 버그 수정: 첫 실행 시 통계 로딩 실패 (2026-07-18)
 버전 **4.0.0 → 4.0.1**(버그 패치, 기능 추가 없음).
