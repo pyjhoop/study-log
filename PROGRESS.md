@@ -53,9 +53,17 @@ npm run tauri build    # 배포 빌드 (단계 8)
 - **대시보드 화면**(`components/dashboard/`): `DashboardScreen`(조합) + ①`LiveMeasure`(과목 select→시작/일시정지/재개/종료 — 피커가 핫키 전용이라 마우스 측정 경로 제공, 상태는 `useSession` 구독) ②`GoalRing`(오늘 누적÷목표 SVG 도넛 + 달성 시 초록, 연필로 **즉석 목표 편집**·프리셋 30/60/120/180/240) ③요약 타일 4개(오늘/이번주/이번달/연속) ④`StudyBarChart`(Recharts 막대 + **일/주/월 토글**, 현재 버킷 강조, 커스텀 툴팁, 빈 기간 안내) ⑤`SubjectDonut`(선택 기간 과목별 도넛+범례·%) ⑥최근 세션 6개. 테마 색은 `hsl(var(--*))`로 라이트/다크 대응.
 - **정리**: 단계 2 임시 패널 `components/session/SessionTester.tsx` 삭제(대시보드로 대체), `MainApp` 대시보드 탭 → `<DashboardScreen/>`. **Rust·capabilities·마이그레이션 변경 없음**(조회는 `sql:default`, 목표 저장은 기존 `sql:allow-execute`).
 
+**추가(같은 세션, 통계 페이지 분리)**
+- **별도 "통계" 탭 신설**(사이드바 대시보드↔기록 사이, `BarChart3`). 대시보드는 통합 요약 그대로 두고, 통계 페이지는 **일간/주간/월간 전환**으로 더 깊이 본다(`components/stats/`).
+- **지난 기간 "같은 시점" 대비 증감(페이스)** — 사용자 선택. `lib/stats.ts` `paceComparison`: 이번 기간 시작~지금 경과 오프셋을 지난 기간 시작에 더한 지점까지를 이전 누적으로 봄(월 비교는 지난달이 짧으면 이번 기간 시작으로 clamp). 일간=오늘vs어제, 주간=이번주vs지난주, 월간=이번달vs지난달. KST는 DST 없어 주/일 오프셋이 정확.
+- **기간별 통계 기록 표**(`PeriodTable`): 최근이 위로, 각 행에 학습시간·세션수·**직전(더 이전) 완료 기간 대비 증감**(▲초록/▼빨강). 진행 중인 이번 기간은 '진행 중' 배지 + 증감 생략(완료 기간과 비교 시 오해 방지).
+- **집계 확장**: `StatBucket`에 `count`(세션 수) 추가, `buildBuckets`/`rangeStart`에 `count` 파라미터(통계 페이지는 일30·주12·월12로 더 길게). `StudyBarChart`에 `title`/`showToggle` prop + 막대 많을 때 X축 라벨 솎기. `time.ts` `formatSignedDurationKo`(`+1시간 40분`). 통계 페이지도 과목별 도넛 재사용.
+
 **검증 결과**
-- `npm run build` ✅ (tsc + vite, 2237 모듈 — recharts 번들 포함). Rust 변경 없어 `cargo check` 불필요.
-- ⏳ 런타임 E2E는 **사용자 테스트 대기** — `npm run tauri dev` 후 대시보드 탭에서: ①측정 시작→종료 시 오늘 링·요약·차트·최근 세션이 **자동 갱신**되는지 ②목표 연필→분 입력/프리셋→링·% 반영, 달성 시 초록·🎉 ③일/주/월 토글로 막대·과목 도넛 범위가 바뀌는지 ④여러 날짜 세션이 로컬 날짜 기준으로 정확히 집계·그룹되는지(주=월요일 시작) ⑤과목별 도넛 %·합계 ⑥연속 학습일수 ⑦과목 0개일 때 측정 카드가 "과목 관리 열기"로 유도.
+- `npm run build` ✅ (tsc + vite, 2240 모듈 — recharts 번들 포함). Rust 변경 없어 `cargo check` 불필요.
+- ⏳ 런타임 E2E는 **사용자 테스트 대기** — `npm run tauri dev` 후:
+  - **대시보드**: ①측정 시작→종료 시 오늘 링·요약·차트·최근 세션 **자동 갱신** ②목표 연필→분/프리셋→링·% 반영, 달성 시 초록·🎉 ③일/주/월 토글로 막대·도넛 범위 전환 ④로컬 날짜 기준 집계(주=월요일 시작) ⑤과목 도넛 %·합계 ⑥연속 학습일수 ⑦과목 0개 시 "과목 관리 열기" 유도.
+  - **통계**: ①일간/주간/월간 전환 시 증감 카드·막대·기록 표·도넛이 함께 바뀌는지 ②지난 기간 같은 시점 대비 증감(시간·%)이 맞는지(예: 지난주 같은 요일·시각까지와 비교) ③기록 표의 완료 기간 증감 정확·진행 중 행은 '진행 중' 표시 ④지난 기간 기록이 없을 때 "새 기록" 표시.
 
 ### ✅ 단계 5 — 세션 저장 + 기록 화면 (2026-07-18)
 **한 일**
@@ -147,16 +155,17 @@ npm run tauri build    # 배포 빌드 (단계 8)
 src/
   main.tsx                 # window.label 분기 진입점
   index.css                # Tailwind + 테마 토큰
-  windows/                 # MainApp(대시보드/기록/과목/저장리스너/핫키등록) / TimerOverlay(완성) / QuickStart(피커 완성)
+  windows/                 # MainApp(대시보드/통계/기록/과목/저장리스너/핫키등록) / TimerOverlay(완성) / QuickStart(피커 완성)
   hooks/{useSubjects,useSessions,useSession,useStats,useOverlayWindow,useSessionRecorder,useGlobalShortcuts}.ts
   #   과목목록 / 세션목록 / 측정상태구독 / 대시보드통계(행+목표+session-saved구독) / 오버레이 위치·크기 / 종료→저장 리스너 / 전역핫키 등록(메인 창)
   lib/{utils,db,types,subjects,ipc,sessions,stats,time,settings,hotkeys}.ts
-  #   cn / DB연결 / 타입 / 과목CRUD / invoke·event래퍼(+showQuickstart/togglePause/focus-main/session-saved) / 세션 저장·조회·수정·삭제 / 통계 집계(일주월버킷·과목분포·연속일) / 경과·날짜·duration계산 / settings K-V / 핫키
+  #   cn / DB연결 / 타입 / 과목CRUD / invoke·event래퍼(+showQuickstart/togglePause/focus-main/session-saved) / 세션 저장·조회·수정·삭제 / 통계 집계(일주월버킷·과목분포·연속일·페이스비교) / 경과·날짜·duration·증감계산 / settings K-V / 핫키
   components/
     ui/{button,input,Modal,ConfirmDialog}.tsx
     subjects/{SubjectsScreen,SubjectEditor}.tsx
     records/{RecordsScreen,SessionEditor}.tsx   # 세션 일별 목록/수정/삭제/수동 추가·메모
-    dashboard/{DashboardScreen,LiveMeasure,GoalRing,StudyBarChart,SubjectDonut}.tsx  # 통계 대시보드(Recharts)
+    dashboard/{DashboardScreen,LiveMeasure,GoalRing,StudyBarChart,SubjectDonut}.tsx  # 통합 요약 대시보드(Recharts)
+    stats/{StatsScreen,ComparisonCard,PeriodTable}.tsx  # 일/주/월 통계 + 지난 기간 같은 시점 대비 증감
 src-tauri/
   src/
     lib.rs                 # 플러그인 초기화 + 마이그레이션 + manage(상태) + invoke_handler

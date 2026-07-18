@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
-import { LayoutDashboard, ListChecks, BookOpen, Settings } from "lucide-react";
+import { LayoutDashboard, BarChart3, ListChecks, BookOpen, Settings } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Toaster } from "sonner";
 import { cn } from "@/lib/utils";
 import { SubjectsScreen } from "@/components/subjects/SubjectsScreen";
 import { RecordsScreen } from "@/components/records/RecordsScreen";
 import { DashboardScreen } from "@/components/dashboard/DashboardScreen";
+import { StatsScreen } from "@/components/stats/StatsScreen";
 import { useSessionRecorder } from "@/hooks/useSessionRecorder";
 import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
 import { onFocusMain } from "@/lib/ipc";
 
-type Screen = "dashboard" | "records" | "subjects" | "settings";
+type Screen = "dashboard" | "stats" | "records" | "subjects" | "settings";
 
 const NAV: { id: Screen; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "dashboard", label: "대시보드", icon: LayoutDashboard },
+  { id: "stats", label: "통계", icon: BarChart3 },
   { id: "records", label: "기록", icon: ListChecks },
   { id: "subjects", label: "과목 관리", icon: BookOpen },
   { id: "settings", label: "설정", icon: Settings },
@@ -21,12 +23,13 @@ const NAV: { id: Screen; label: string; icon: typeof LayoutDashboard }[] = [
 
 const PLACEHOLDER: Record<Screen, string> = {
   dashboard: "오늘 진행 · 일/주/월 통계 · 최근 세션이 여기에 표시됩니다.",
+  stats: "일간/주간/월간 통계와 지난 기간 대비 증감이 여기에 표시됩니다.",
   records: "학습 세션 목록(수정/삭제/수동 추가)과 메모가 여기에 표시됩니다.",
   subjects: "과목 CRUD(이름/색/정렬/보관)가 여기에 표시됩니다.",
   settings: "핫키 · 오버레이 · 뽀모도로 · 목표시간 설정이 여기에 표시됩니다.",
 };
 
-const SCREENS: Screen[] = ["dashboard", "records", "subjects", "settings"];
+const SCREENS: Screen[] = ["dashboard", "stats", "records", "subjects", "settings"];
 
 export default function MainApp() {
   const [screen, setScreen] = useState<Screen>("dashboard");
@@ -104,6 +107,8 @@ export default function MainApp() {
             <RecordsScreen />
           ) : screen === "dashboard" ? (
             <DashboardScreen />
+          ) : screen === "stats" ? (
+            <StatsScreen />
           ) : (
             <div className="flex h-full items-center justify-center rounded-xl border border-dashed">
               <div className="max-w-md text-center">

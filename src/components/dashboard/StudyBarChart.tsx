@@ -24,40 +24,49 @@ export function StudyBarChart({
   buckets,
   granularity,
   onGranularityChange,
+  title = "학습 시간 추이",
+  showToggle = true,
 }: {
   buckets: StatBucket[];
   granularity: Granularity;
   onGranularityChange: (g: Granularity) => void;
+  title?: string;
+  /** 헤더의 일/주/월 토글 표시 여부(페이지가 토글을 따로 두면 false). */
+  showToggle?: boolean;
 }) {
   const data = useMemo(
     () => buckets.map((b) => ({ ...b, minutes: Math.round(b.total / 60) })),
     [buckets],
   );
   const hasAny = buckets.some((b) => b.total > 0);
+  // 막대가 많으면 X축 라벨을 솎아 겹치지 않게 한다(예: 30일 → 대략 8개 라벨).
+  const tickInterval = Math.max(0, Math.floor(data.length / 12));
 
   return (
     <div className="rounded-xl border bg-card p-5">
       <div className="mb-4 flex items-center justify-between">
         <span className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
           <BarChart3 className="h-4 w-4" />
-          학습 시간 추이
+          {title}
         </span>
-        <div className="flex rounded-md border p-0.5">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => onGranularityChange(t.id)}
-              className={cn(
-                "rounded px-2.5 py-1 text-xs font-medium transition-colors",
-                granularity === t.id
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {showToggle && (
+          <div className="flex rounded-md border p-0.5">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => onGranularityChange(t.id)}
+                className={cn(
+                  "rounded px-2.5 py-1 text-xs font-medium transition-colors",
+                  granularity === t.id
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="h-[220px] w-full">
@@ -69,7 +78,7 @@ export function StudyBarChart({
                 tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
                 tickLine={false}
                 axisLine={{ stroke: "hsl(var(--border))" }}
-                interval={0}
+                interval={tickInterval}
               />
               <YAxis
                 width={34}

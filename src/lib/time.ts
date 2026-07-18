@@ -39,6 +39,13 @@ export function formatDurationKo(totalSec: number): string {
   return `${m}분`;
 }
 
+/** 초 → 부호 있는 길이. 증감 표시용. 예: `+1시간 40분`, `-30분`, `±0분`. */
+export function formatSignedDurationKo(deltaSec: number): string {
+  const s = Math.round(deltaSec);
+  if (s === 0) return "±0분";
+  return (s > 0 ? "+" : "-") + formatDurationKo(Math.abs(s));
+}
+
 /** epoch(초) → 로컬 날짜 라벨 `YYYY-MM-DD (요일)`. 기록 일별 그룹 헤더용. */
 export function formatDayLabel(epochSec: number): string {
   const d = new Date(epochSec * 1000);

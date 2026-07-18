@@ -30,8 +30,29 @@ export interface StatBucket {
   /** 툴팁 제목(길게). 예: `7/18 (금)`, `2026년 7월` */
   tooltip: string;
   total: number;
+  /** 그 기간의 세션 수. */
+  count: number;
   /** 현재(오늘/이번주/이번달) 버킷인지 — 강조용. */
   isCurrent: boolean;
+}
+
+/** 진행 중인 이번 기간을 지난 기간의 "같은 시점"과 비교한 결과(페이스). */
+export interface PaceComparison {
+  granularity: Granularity;
+  /** 현재 기간 라벨. 예: `오늘` / `이번 주` / `이번 달` */
+  currentLabel: string;
+  /** 이전 기간 라벨. 예: `어제` / `지난 주` / `지난 달` */
+  previousLabel: string;
+  /** 현재 기간 지금까지 누적(초). */
+  current: number;
+  /** 이전 기간 같은 시점까지 누적(초). */
+  previous: number;
+  /** current - previous(초). */
+  deltaSec: number;
+  /** 증감률(%). previous가 0이면 null(비율 불가). */
+  deltaPct: number | null;
+  /** 같은 시점 기준 설명. 예: `수요일 14시까지` */
+  pointNote: string;
 }
 
 /** 과목별 분포 조각. */
@@ -76,8 +97,34 @@ function sec(d: Date): number {
   return Math.floor(d.getTime() / 1000);
 }
 
-/** 각 granularity에서 몇 개의 버킷을 보여줄지. */
+/** 각 granularity에서 기본으로 몇 개의 버킷을 보여줄지(대시보드용). 통계 페이지는 더 길게 요청. */
 const BUCKET_COUNT: Record<Granularity, number> = { day: 14, week: 8, month: 6 };
+
+const CUR_LABEL: Record<Granularity, string> = { day: "오늘", week: "이번 주", month: "이번 달" };
+const PREV_LABEL: Record<Granularity, string> = { day: "어제", week: "지난 주", month: "지난 달" };
+
+/** 현재 기간의 시작(0시). */
+function periodStart(g: Granularity, now: Date): Date {
+  if (g === "day") return startOfDay(now);
+  if (g === "week") return startOfWeek(now);
+  return startOfMonth(now);
+}
+/** 직전 기간의 시작(0시). */
+function prevPeriodStart(g: Granularity, now: Date): Date {
+  if (g === "day") {
+    const d = startOfDay(now);
+    d.setDate(d.getDate() - 1);
+    return d;
+  }
+  if (g === "week") {
+    const d = startOfWeek(now);
+    d.setDate(d.getDate() - 7);
+    return d;
+  }
+  const d = startOfMonth(now);
+  d.setMonth(d.getMonth() - 1);
+  return d;
+}
 
 // ── 조회 ─────────────────────────────────────────────────────────
 /** 통계용 세션 행 전체(오래된→최근). */
@@ -94,17 +141,25 @@ export async function fetchStatRows(): Promise<StatRow[]> {
 
 // ── 집계(순수 함수) ───────────────────────────────────────────────
 
-/** 세션을 buckets(현재 시점 기준 최근 N개)로 묶어 반환. 빈 버킷은 0으로 채운다. */
-export function buildBuckets(rows: StatRow[], g: Granularity, now = new Date()): StatBucket[] {
-  const count = BUCKET_COUNT[g];
-
-  // 세션 → 버킷 키별 합계.
+/**
+ * 세션을 buckets(현재 시점 기준 최근 N개, 오래된→최근)로 묶어 반환. 빈 버킷은 0으로 채운다.
+ * count를 지정하면 그만큼(통계 페이지는 더 긴 기록), 기본은 대시보드용 BUCKET_COUNT.
+ */
+export function buildBuckets(
+  rows: StatRow[],
+  g: Granularity,
+  count: number = BUCKET_COUNT[g],
+  now = new Date(),
+): StatBucket[] {
+  // 세션 → 버킷 키별 합계·개수.
   const totals = new Map<string, number>();
+  const counts = new Map<string, number>();
   for (const r of rows) {
     const rd = new Date(r.started_at * 1000);
     const key =
       g === "day" ? dateKey(startOfDay(rd)) : g === "week" ? dateKey(startOfWeek(rd)) : monthKey(rd);
     totals.set(key, (totals.get(key) ?? 0) + r.duration_sec);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
   }
 
   const out: StatBucket[] = [];
@@ -119,17 +174,21 @@ export function buildBuckets(rows: StatRow[], g: Granularity, now = new Date()):
         label: `${d.getMonth() + 1}/${d.getDate()}`,
         tooltip: `${d.getMonth() + 1}/${d.getDate()} (${WEEKDAY_KO[d.getDay()]})`,
         total: totals.get(key) ?? 0,
+        count: counts.get(key) ?? 0,
         isCurrent,
       });
     } else if (g === "week") {
       const d = startOfWeek(now);
       d.setDate(d.getDate() - i * 7);
       const key = dateKey(d);
+      const end = new Date(d);
+      end.setDate(end.getDate() + 6);
       out.push({
         key,
         label: `${d.getMonth() + 1}/${d.getDate()}`,
-        tooltip: `${d.getMonth() + 1}/${d.getDate()} 주`,
+        tooltip: `${d.getMonth() + 1}/${d.getDate()} ~ ${end.getMonth() + 1}/${end.getDate()}`,
         total: totals.get(key) ?? 0,
+        count: counts.get(key) ?? 0,
         isCurrent,
       });
     } else {
@@ -141,6 +200,7 @@ export function buildBuckets(rows: StatRow[], g: Granularity, now = new Date()):
         label: `${d.getMonth() + 1}월`,
         tooltip: `${d.getFullYear()}년 ${d.getMonth() + 1}월`,
         total: totals.get(key) ?? 0,
+        count: counts.get(key) ?? 0,
         isCurrent,
       });
     }
@@ -149,8 +209,11 @@ export function buildBuckets(rows: StatRow[], g: Granularity, now = new Date()):
 }
 
 /** 현재 granularity에서 보이는 범위의 시작 epoch(초) — 과목별 분포 범위와 맞춘다. */
-export function rangeStart(g: Granularity, now = new Date()): number {
-  const count = BUCKET_COUNT[g];
+export function rangeStart(
+  g: Granularity,
+  count: number = BUCKET_COUNT[g],
+  now = new Date(),
+): number {
   if (g === "day") {
     const d = startOfDay(now);
     d.setDate(d.getDate() - (count - 1));
@@ -212,4 +275,48 @@ export function computeStreak(rows: StatRow[], now = new Date()): number {
     d.setDate(d.getDate() - 1);
   }
   return streak;
+}
+
+/** 같은 시점 기준 설명 문구. */
+function pointNote(g: Granularity, now: Date): string {
+  const hh = now.getHours();
+  if (g === "day") return `오늘 ${hh}시 기준`;
+  if (g === "week") return `${WEEKDAY_KO[now.getDay()]}요일 ${hh}시까지`;
+  return `${now.getDate()}일 ${hh}시까지`;
+}
+
+/**
+ * 진행 중인 이번 기간을 **지난 기간의 같은 시점**과 비교한다(페이스).
+ * 이번 기간 시작부터 지금까지의 경과 오프셋을 지난 기간 시작에 더한 지점까지를 이전 누적으로 본다.
+ * (월 비교에서 지난달이 더 짧으면 이전 기간 끝(=이번 기간 시작)으로 잘라 넘치지 않게 한다.)
+ */
+export function paceComparison(rows: StatRow[], g: Granularity, now = new Date()): PaceComparison {
+  const curStartSec = sec(periodStart(g, now));
+  const prevStartSec = sec(prevPeriodStart(g, now));
+  const nowSec = Math.floor(now.getTime() / 1000);
+  const offset = nowSec - curStartSec;
+  const prevCutoff = Math.min(prevStartSec + offset, curStartSec);
+
+  let current = 0;
+  let previous = 0;
+  for (const r of rows) {
+    if (r.started_at >= curStartSec && r.started_at <= nowSec) {
+      current += r.duration_sec;
+    } else if (r.started_at >= prevStartSec && r.started_at <= prevCutoff) {
+      previous += r.duration_sec;
+    }
+  }
+
+  const deltaSec = current - previous;
+  const deltaPct = previous > 0 ? Math.round((deltaSec / previous) * 100) : null;
+  return {
+    granularity: g,
+    currentLabel: CUR_LABEL[g],
+    previousLabel: PREV_LABEL[g],
+    current,
+    previous,
+    deltaSec,
+    deltaPct,
+    pointNote: pointNote(g, now),
+  };
 }
