@@ -49,6 +49,14 @@ export function getSessionState(): Promise<SessionSnapshot> {
   return invoke<SessionSnapshot>("get_session_state");
 }
 
+/**
+ * 종료됐지만 아직 저장 못 한 요약을 가져간다(있으면 요약, 없으면 null). 가져가면 Rust에서 비운다.
+ * 메인 창이 마운트 시 호출해 `session-finished` 이벤트를 놓쳤을 때의 유실을 메운다.
+ */
+export function takePendingFinished(): Promise<SessionSummary | null> {
+  return invoke<SessionSummary | null>("take_pending_finished");
+}
+
 /** 타이머 오버레이 표시/숨김 토글. 반환값은 토글 후 표시 여부. */
 export function toggleOverlay(): Promise<boolean> {
   return invoke<boolean>("toggle_overlay");

@@ -37,6 +37,24 @@ export async function saveSession(
   return true;
 }
 
+/**
+ * 같은 세션이 이미 저장돼 있는지(자연키 = 과목·시작·종료 초). 크래시 복구/종료 요약 배수가
+ * 정상 저장과 겹쳐도 중복 INSERT되지 않게 하는 dedup 가드. 서로 다른 실제 세션이 초 단위로
+ * 과목·시작·종료가 모두 같을 가능성은 사실상 없다.
+ */
+export async function sessionExists(
+  subjectId: number,
+  startedAt: number,
+  endedAt: number,
+): Promise<boolean> {
+  const db = await getDb();
+  const rows = await db.select<{ c: number }[]>(
+    "SELECT COUNT(*) AS c FROM sessions WHERE subject_id = ? AND started_at = ? AND ended_at = ?",
+    [subjectId, startedAt, endedAt],
+  );
+  return (rows[0]?.c ?? 0) > 0;
+}
+
 /** 세션 목록(과목 이름/색 JOIN). 최근순. 기록 화면에서 사용. */
 export async function listSessions(limit = 1000): Promise<SessionWithSubject[]> {
   const db = await getDb();

@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { emitSessionSaved, getSessionState, onSessionChanged } from "@/lib/ipc";
 import { clearLive, readLive, writeLive } from "@/lib/liveSession";
-import { saveSession } from "@/lib/sessions";
+import { saveSession, sessionExists } from "@/lib/sessions";
 import { getSubject } from "@/lib/subjects";
 import { computeElapsed, formatHMS, nowSec } from "@/lib/time";
 import type { SessionSnapshot, SessionSummary } from "@/lib/types";
@@ -65,7 +65,11 @@ export function useLiveSessionGuard() {
           const live = await readLive();
           if (live) {
             await clearLive();
-            if (live.duration_sec > 0) {
+            // 하트비트 쓰기가 정상 종료의 clearLive 뒤에 늦게 도착해 잔재가 남았거나,
+            // 정상 저장 직후 clearLive 전에 죽은 경우 → 이미 저장된 세션과 겹칠 수 있으니
+            // 자연키로 확인해 중복 저장을 막는다(진짜 비정상 종료면 존재하지 않아 정상 저장).
+            const dup = await sessionExists(live.subject_id, live.started_at, live.ended_at);
+            if (live.duration_sec > 0 && !dup) {
               const saved = await saveSession(live);
               if (saved) {
                 const name = (await getSubject(live.subject_id))?.name ?? "과목";

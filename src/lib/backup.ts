@@ -42,6 +42,9 @@ export const DEFAULT_BACKUP_CONFIG: BackupConfig = {
   path: "study-log-backup.json",
 };
 
+/** 이 앱이 복원할 수 있는 백업 포맷 버전. */
+const SUPPORTED_VERSIONS = new Set([1, 2]);
+
 /** 백업 파일 전체 구조(버전 2). */
 export interface BackupPayload {
   version: number;
@@ -49,6 +52,60 @@ export interface BackupPayload {
   subjects: Subject[];
   sessions: Session[];
   settings: Record<string, unknown>;
+}
+
+function isNum(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v);
+}
+
+/** 평범한 객체(배열·null 아님)인지. */
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/**
+ * 파괴적 복원(전체 DELETE) 전에 페이로드를 검증한다. 버전·각 행의 필드 타입까지 확인해,
+ * 손상/손편집된 백업이 삭제만 시키고 일부만 복원되는 사고(부분 복원 = 데이터 유실)를 막는다.
+ * 문제가 있으면 던진다(→ DB는 손대지 않음).
+ */
+function validatePayload(payload: BackupPayload): void {
+  if (!isNum(payload.version) || !SUPPORTED_VERSIONS.has(payload.version)) {
+    throw new Error(`지원하지 않는 백업 버전입니다(v${payload.version}). 앱을 업데이트하세요.`);
+  }
+  if (!Array.isArray(payload.subjects) || !Array.isArray(payload.sessions)) {
+    throw new Error("백업 파일 형식이 올바르지 않습니다.");
+  }
+  if (payload.settings !== undefined && !isPlainObject(payload.settings)) {
+    throw new Error("백업 설정 형식이 올바르지 않습니다.");
+  }
+  payload.subjects.forEach((s, i) => {
+    if (
+      !isPlainObject(s) ||
+      !isNum(s.id) ||
+      typeof s.name !== "string" ||
+      typeof s.color !== "string" ||
+      !isNum(s.sort_order) ||
+      !isNum(s.archived) ||
+      !isNum(s.created_at)
+    ) {
+      throw new Error(`백업 과목 ${i + 1}행의 형식이 올바르지 않습니다.`);
+    }
+  });
+  payload.sessions.forEach((s, i) => {
+    if (
+      !isPlainObject(s) ||
+      !isNum(s.id) ||
+      !isNum(s.subject_id) ||
+      !isNum(s.started_at) ||
+      !isNum(s.ended_at) ||
+      !isNum(s.duration_sec) ||
+      !isNum(s.paused_sec) ||
+      !isNum(s.created_at) ||
+      !(s.memo === null || typeof s.memo === "string")
+    ) {
+      throw new Error(`백업 세션 ${i + 1}행의 형식이 올바르지 않습니다.`);
+    }
+  });
 }
 
 // ── 설정 로드/저장 ────────────────────────────────────────────────
@@ -122,8 +179,15 @@ export async function exportData(): Promise<BackupPayload> {
   return { version: 2, exported_at: nowSec(), subjects, sessions, settings };
 }
 
-/** 백업 페이로드로 로컬 DB를 전체 교체한다(복원). 파괴적이므로 호출부에서 확인 후 실행할 것. */
+/**
+ * 백업 페이로드로 로컬 DB를 전체 교체한다(복원). 파괴적이므로 호출부에서 확인 후 실행할 것.
+ * 반드시 `validatePayload`를 통과한(=`fetchBackup`이 돌려준) 페이로드만 넘긴다 — 삭제 후
+ * INSERT 도중 타입 오류로 던져 부분 복원(데이터 유실)이 나지 않도록 값은 미리 검증돼 있어야 한다.
+ * (tauri-plugin-sql은 커넥션 풀이라 JS에서 BEGIN/COMMIT을 나눠 걸어도 한 트랜잭션이 보장되지
+ *  않으므로, 원자성 대신 사전 검증으로 실패 지점을 없애는 전략이다.)
+ */
 export async function importData(payload: BackupPayload): Promise<void> {
+  validatePayload(payload); // 방어적 재검증(직접 호출 대비)
   const db = await getDb();
   // FK 때문에 sessions 먼저 비우고, subjects → sessions 순으로 채운다.
   await db.execute("DELETE FROM sessions");
@@ -226,9 +290,8 @@ export async function fetchBackup(config: BackupConfig, token: string): Promise<
   if (!body.content) throw new Error("백업 파일 내용을 읽을 수 없습니다.");
   const json = fromBase64Utf8(body.content);
   const payload = JSON.parse(json) as BackupPayload;
-  if (!payload || !Array.isArray(payload.subjects) || !Array.isArray(payload.sessions)) {
-    throw new Error("백업 파일 형식이 올바르지 않습니다.");
-  }
+  // 파괴적 복원 전에 여기서 전량 검증 → 문제가 있으면 DB를 건드리기 전에 던진다.
+  validatePayload(payload);
   return payload;
 }
 

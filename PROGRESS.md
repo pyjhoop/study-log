@@ -25,6 +25,7 @@
 | 9 | **v2**: 비정상 종료 세션 자동 복구 · Windows 자동 시작 · GitHub 백업/복원 · Actions 릴리스 자동화 | ✅ 완료 |
 | 10 | **v3**: 오버레이 레이아웃(variant) 6종 · 에셋 파일명 영문화(productName) · v3.0.0 | ✅ 완료 |
 | 11 | **v3.1**: 대시보드 학습 잔디(GitHub 컨트리뷰션 히트맵) · v3.1.0 | ✅ 완료 |
+| 12 | **안정성 보강**(멀티에이전트 코드리뷰 후속): 데이터 유실·경합·견고성·통계 표시 오차 수정 | ✅ 완료 |
 
 - v2 기획: [`docs/03-v2-기능-기획.md`](./docs/03-v2-기능-기획.md)
 
@@ -49,6 +50,22 @@ npm run tauri build    # 배포 빌드 (단계 8)
 ---
 
 ## 단계별 완료 로그
+
+### ✅ 단계 12 — 안정성 보강 (코드리뷰 후속) (2026-07-18)
+버전 **3.1.0 → 3.1.1**(버그·안정성 패치, 기능 추가 없음). 상세: [`docs/04-안정성-보강.md`](./docs/04-안정성-보강.md).
+
+**배경**: 서브시스템별 코드리뷰(Rust 코어·세션/뽀모도로·통계·백업·오버레이/UI)로 데이터 유실·경합·견고성·표시 오차를 점검하고 수정.
+
+**한 일(14건)**
+- 🔴 **데이터 유실 3**: ①복원 파괴 전 `validatePayload`로 버전·행 전량 검증(부분 복원=유실 방지, `backup.ts`). ②뽀모도로 `blockStartStudy: args.elapsedSec` — 측정 중 리로드가 진행 세션을 강제 일시정지하던 것 수정(`usePomodoro.ts`). ③종료 요약을 Rust `PendingFinished`에 보관 + `take_pending_finished`로 메인 창 마운트 시 배수 → 리스너 준비 전 종료 유실 방어(`commands.rs`/`lib.rs`/`useSessionRecorder.ts`).
+- 🟠 **경합 4**: ④핫키 재등록 generation 토큰 직렬화(`useGlobalShortcuts.ts`). ⑤`sessionExists` 자연키 dedup(`sessions.ts`/`useLiveSessionGuard.ts`) — 복구·배수 중복 저장 방지. ⑥단축키 캡처 제어형화 + 활성 행 단일화(`HotkeyCapture.tsx`/`HotkeysSection.tsx`). ⑦오버레이 설정 `optRef` 병합으로 빠른 편집 유실 방지(`OverlaySection.tsx`).
+- 🟡 **견고성 4**: ⑧Alt+F4 창 파괴 방지(main/timer/quickstart 모두 hide, `lib.rs`). ⑨오버레이 `clampToMonitors`로 화면 밖 복원 방지 + 권한 2종(`useOverlayWindow.ts`/`timer.json`). ⑩Rust 뮤텍스 poison 복구 `lock()` 헬퍼 + 트레이 아이콘 `expect`→에러 반환(`commands.rs`/`tray.rs`). ⑪백업 버전·스키마 검증(#1에 포함).
+- 🟢 **통계 표시 4**: ⑫`samePointInPrev` 달력 연산으로 DST·월말 비교 정확화(`stats.ts`). ⑬히트맵 월 라벨을 1일 포함 열에, "최근 1년"은 365일 카운트(`stats.ts`/`ContributionHeatmap.tsx`). ⑭`StatBucket.prevTotal`로 기간 표 증감 경계 끊김 수정(`stats.ts`/`PeriodTable.tsx`).
+- **버전 3.1.1**: `tauri.conf.json`/`Cargo.toml`/`package.json`/사이드바.
+
+**검증 결과**
+- `npm run build` ✅ (tsc + vite, 2271 모듈) · `cargo check` ✅ (`study-log v3.1.1`, 에러 0).
+- ⏳ 런타임 E2E는 **사용자 테스트 대기** — 체크리스트는 [`docs/04-안정성-보강.md`](./docs/04-안정성-보강.md) "검증 안내" 참고(복원 손상본 방어·리로드 강제휴식·핫키 연속저장·멀티모니터 복귀·Alt+F4·히트맵/표 표시).
 
 ### ✅ 단계 11 — v3.1 (대시보드 학습 잔디) (2026-07-18)
 버전 **3.0.0 → 3.1.0**(`tauri.conf.json`/`Cargo.toml`/`package.json`/사이드바).

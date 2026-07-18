@@ -27,7 +27,7 @@ const MENU_QUIT: &str = "tray_quit";
 pub const TRAY_ID: &str = "main-tray";
 
 /// 앱 setup에서 한 번 호출해 트레이를 만든다.
-pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
+pub fn build_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let start = MenuItem::with_id(app, MENU_START, "측정 시작", true, None::<&str>)?;
     let stop = MenuItem::with_id(app, MENU_STOP, "측정 종료", true, None::<&str>)?;
     let pause = MenuItem::with_id(app, MENU_PAUSE, "일시정지 / 재개", true, None::<&str>)?;
@@ -40,8 +40,13 @@ pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         &[&start, &stop, &pause, &overlay, &dashboard, &sep, &quit],
     )?;
 
+    // 번들에 기본 창 아이콘이 없으면 패닉(앱 시작 크래시) 대신 에러로 돌려준다.
+    let icon = app
+        .default_window_icon()
+        .cloned()
+        .ok_or("기본 창 아이콘이 없어 트레이를 만들 수 없습니다")?;
     TrayIconBuilder::with_id(TRAY_ID)
-        .icon(app.default_window_icon().cloned().expect("트레이 아이콘 없음"))
+        .icon(icon)
         .tooltip("학습기록")
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -51,7 +56,11 @@ pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
                 let _ = commands::show_quickstart(app.clone(), app.state::<Mutex<Measurement>>());
             }
             MENU_STOP => {
-                let _ = commands::stop_session(app.clone(), app.state::<Mutex<Measurement>>());
+                let _ = commands::stop_session(
+                    app.clone(),
+                    app.state::<Mutex<Measurement>>(),
+                    app.state::<commands::PendingFinished>(),
+                );
             }
             MENU_PAUSE => {
                 let _ = commands::toggle_pause(app.clone(), app.state::<Mutex<Measurement>>());

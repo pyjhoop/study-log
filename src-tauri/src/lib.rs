@@ -27,6 +27,8 @@ pub fn run() {
     let mut builder = tauri::Builder::default()
         // 측정 상태 단일 소스. 커맨드에서 `State<Mutex<Measurement>>`로 주입받는다.
         .manage(Mutex::new(Measurement::idle()))
+        // 종료됐지만 아직 저장 못 한 요약 보관함(리스너 준비 전 종료 시 유실 방어).
+        .manage(Mutex::new(None::<state::SessionSummary>))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         // GitHub 백업/복원(F3)이 GitHub API를 CORS 없이 호출하기 위한 HTTP 플러그인.
@@ -64,13 +66,18 @@ pub fn run() {
             }
             Ok(())
         })
-        // 메인 창 X → 종료 대신 트레이로 숨김(백그라운드 유지·핫키 계속 동작).
-        // 완전 종료는 트레이 "종료"(app.exit)로만.
+        // 창 닫기(X·Alt+F4) → 종료·파괴 대신 숨김.
+        //  - main: 트레이로 상주(백그라운드 유지·핫키 계속 동작). 완전 종료는 트레이 "종료"만.
+        //  - timer/quickstart: 테두리 없는 창이라 Alt+F4로 focus 시 **파괴**되면 오버레이/시작
+        //    피커가 재시작 전까지 먹통이 된다 → 파괴 대신 숨겨 재사용한다.
         .on_window_event(|window, event| {
-            if window.label() == "main" {
-                if let WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close();
-                    let _ = window.hide();
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                match window.label() {
+                    "main" | "timer" | "quickstart" => {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    }
+                    _ => {}
                 }
             }
         })
@@ -80,6 +87,7 @@ pub fn run() {
             commands::resume_session,
             commands::stop_session,
             commands::get_session_state,
+            commands::take_pending_finished,
             commands::toggle_overlay,
             commands::show_quickstart,
             commands::toggle_pause,

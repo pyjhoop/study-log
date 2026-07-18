@@ -12,6 +12,8 @@
     "core:window:allow-set-position",
     "core:window:allow-set-size",
     "core:window:allow-set-always-on-top",
+    "core:window:allow-available-monitors",
+    "core:window:allow-primary-monitor",
     "sql:default",
     "sql:allow-execute",
     "notification:default",

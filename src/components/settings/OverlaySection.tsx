@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MonitorSmartphone } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/Switch";
@@ -28,15 +28,22 @@ const SHOW_LABELS: { key: keyof OverlayShowItems; label: string }[] = [
  */
 export function OverlaySection() {
   const [opt, setOpt] = useState<OverlayOptions>(DEFAULT_OVERLAY_OPTIONS);
+  // 같은 틱에 연속으로 patch가 불릴 때(빠른 토글·색+투명도 드래그) 렌더 이전의 stale `opt`에
+  // 각각 병합돼 앞 변경이 유실되는 것을 막기 위해 최신 값을 ref로도 들고 즉시 갱신한다.
+  const optRef = useRef(opt);
 
   useEffect(() => {
     void loadOverlayOptions()
-      .then(setOpt)
+      .then((o) => {
+        optRef.current = o;
+        setOpt(o);
+      })
       .catch((e) => console.error("[OverlaySection] 설정 로드 실패", e));
   }, []);
 
   const patch = async (next: Partial<OverlayOptions>) => {
-    const merged = { ...opt, ...next };
+    const merged = { ...optRef.current, ...next };
+    optRef.current = merged;
     setOpt(merged);
     try {
       await saveOverlayOptions(merged);
@@ -46,7 +53,7 @@ export function OverlaySection() {
   };
 
   const patchShow = (key: keyof OverlayShowItems, v: boolean) =>
-    void patch({ show: { ...opt.show, [key]: v } });
+    void patch({ show: { ...optRef.current.show, [key]: v } });
 
   // 미리보기용 샘플 뷰모델(색·투명도·표시항목은 실제 옵션 반영, 크기는 미리보기 고정).
   const previewVm: OverlayViewModel = {

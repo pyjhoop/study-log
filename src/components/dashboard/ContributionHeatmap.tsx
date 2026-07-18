@@ -48,10 +48,14 @@ export function ContributionHeatmap({
 }) {
   const { weeks, months } = useMemo(() => buildHeatmap(rows, WEEKS), [rows]);
   const goalSec = goalMin * 60;
-  const activeDays = useMemo(
-    () => weeks.reduce((n, w) => n + w.filter((c) => c.total > 0).length, 0),
-    [weeks],
-  );
+  // 격자는 53주(약 371일)라 정확히 "1년"보다 길다 → 최근 365일 안의 학습일만 센다.
+  const activeDays = useMemo(() => {
+    const cutoff = Math.floor(Date.now() / 1000) - 365 * 86400;
+    return weeks.reduce(
+      (n, w) => n + w.filter((c) => c.total > 0 && c.sec >= cutoff).length,
+      0,
+    );
+  }, [weeks]);
 
   return (
     <div className="rounded-xl border bg-card p-5">

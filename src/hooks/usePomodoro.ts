@@ -97,7 +97,10 @@ export function usePomodoro(args: {
       runId: args.startedAt,
       phase: "focus",
       breakKind: "short",
-      blockStartStudy: 0,
+      // 새 세션은 elapsed≈0. 측정 중 웹뷰가 리로드/재생성되면 elapsedSec이 크게 복구되는데,
+      // 여기서 0으로 두면 다음 틱에 blockElapsed=elapsed-0≥목표가 즉시 참이 돼 진행 중 세션을
+      // 강제 휴식(pause)시킨다 → 현재 경과를 이 블록 시작점으로 잡아 그 오작동을 막는다.
+      blockStartStudy: args.elapsedSec,
       breakStartWall: 0,
       completedFocus: 0,
     };
@@ -126,7 +129,7 @@ export function usePomodoro(args: {
             s.completedFocus % Math.max(1, cfg.cyclesUntilLong) === 0 ? "long" : "short";
           s.phase = "break";
           s.breakStartWall = nowSec();
-          void pauseSession().catch(() => {});
+          void pauseSession().catch((e) => console.warn("[pomodoro] 자동 일시정지 실패", e));
           void notify(
             cfg,
             "집중 완료 🎉",
@@ -141,7 +144,7 @@ export function usePomodoro(args: {
         if (breakElapsed >= Math.max(1, breakTarget)) {
           s.phase = "focus";
           s.blockStartStudy = elapsedSec; // 정지 중 멈춰 있던 누적 공부 = 이 블록 시작점
-          void resumeSession().catch(() => {});
+          void resumeSession().catch((e) => console.warn("[pomodoro] 자동 재개 실패", e));
           void notify(cfg, "휴식 종료", "다시 집중해볼까요?");
         }
       }

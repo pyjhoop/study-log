@@ -17,11 +17,12 @@ export function PeriodTable({
   buckets: StatBucket[];
   onSelect: (offset: number) => void;
 }) {
-  // 오래된→최근 순서에서 직전 기간 대비 증감을 구한 뒤 최근이 위로 오게 뒤집는다.
+  // 직전 기간 대비 증감(bucket.prevTotal은 창 밖이어도 실제 직전 기간 합계라 경계에서 안 끊긴다).
+  // 기록이 아예 없던 직전 기간(0)과의 비교는 의미가 약하므로 증감을 생략한다.
   const rows = useMemo(
     () =>
       buckets
-        .map((b, i) => ({ bucket: b, delta: i > 0 ? b.total - buckets[i - 1].total : null }))
+        .map((b) => ({ bucket: b, delta: b.prevTotal > 0 ? b.total - b.prevTotal : null }))
         .reverse(),
     [buckets],
   );

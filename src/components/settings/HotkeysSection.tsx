@@ -38,6 +38,9 @@ function findDuplicate(b: HotkeyBindings): string | null {
 export function HotkeysSection() {
   const [binds, setBinds] = useState<HotkeyBindings>(DEFAULT_HOTKEYS);
   const [saved, setSaved] = useState<HotkeyBindings>(DEFAULT_HOTKEYS);
+  // 현재 키 캡처 중인 행(한 번에 하나만). 여러 행 동시 캡처로 한 키에 두 바인딩이
+  // 덮어써지는 것을 막는다.
+  const [capturingKey, setCapturingKey] = useState<keyof HotkeyBindings | null>(null);
 
   useEffect(() => {
     void loadHotkeys()
@@ -86,6 +89,8 @@ export function HotkeysSection() {
         <Row key={key} label={label}>
           <HotkeyCapture
             value={binds[key]}
+            capturing={capturingKey === key}
+            onCapturingChange={(on) => setCapturingKey(on ? key : null)}
             onChange={(accel) => setBinds((b) => ({ ...b, [key]: accel }))}
           />
         </Row>

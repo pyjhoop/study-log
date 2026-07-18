@@ -23,13 +23,20 @@ export function useGlobalShortcuts(onDashboard: () => void) {
   const onDashRef = useRef(onDashboard);
   onDashRef.current = onDashboard;
 
+  // 재등록 세대 토큰: 초기 등록과 `hotkeys-changed` 재등록(또는 연속 저장)이 겹칠 때,
+  // 나중에 시작한 실행만 살아남게 해서 서로의 register/unregister가 엉키지 않게 한다.
+  const genRef = useRef(0);
+
   useEffect(() => {
     // StrictMode(개발) 이중 마운트/비동기 경쟁 대비.
     let active = true;
 
     const registerAll = async (announce: boolean) => {
+      const gen = ++genRef.current;
       const binds = await loadHotkeys();
+      if (gen !== genRef.current) return; // 더 최신 실행이 시작됨 → 양보
       await unregisterAll().catch(() => {});
+      if (gen !== genRef.current) return;
 
       // global-shortcut 콜백은 Pressed/Released 양쪽에서 불리므로 Pressed만 처리한다.
       const entries: [string, () => void][] = [
@@ -42,7 +49,7 @@ export function useGlobalShortcuts(onDashboard: () => void) {
 
       const failed: string[] = [];
       for (const [accel, action] of entries) {
-        if (!active) return;
+        if (!active || gen !== genRef.current) return;
         try {
           await register(accel, (event) => {
             if (event.state === "Pressed") action();
@@ -53,7 +60,7 @@ export function useGlobalShortcuts(onDashboard: () => void) {
           console.warn(`전역 핫키 등록 실패: ${accel}`, e);
         }
       }
-      if (announce && failed.length) {
+      if (gen === genRef.current && announce && failed.length) {
         toast.error(`이미 사용 중인 단축키: ${failed.join(", ")}`);
       }
     };

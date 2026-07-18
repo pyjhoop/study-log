@@ -9,6 +9,10 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::state::{now_epoch, Measurement, SessionSnapshot, SessionSummary, Status};
 
+/// 종료됐지만 아직 메인 창 JS가 저장하지 못한 마지막 요약을 보관하는 상태.
+/// `lib.rs`에서 `Mutex::new(None)`으로 manage하고, 메인 창이 마운트 시 배수한다.
+pub type PendingFinished = Mutex<Option<SessionSummary>>;
+
 /// 상태 변경 브로드캐스트 이벤트 이름(kebab-case 규약).
 const EVENT_SESSION_CHANGED: &str = "session-changed";
 /// 측정 종료 시 요약을 실어 보내는 이벤트. **메인 창이 받아 세션을 저장**한다
@@ -23,6 +27,13 @@ const QUICKSTART_LABEL: &str = "quickstart";
 fn broadcast(app: &AppHandle, snap: &SessionSnapshot) -> Result<(), String> {
     app.emit(EVENT_SESSION_CHANGED, snap)
         .map_err(|e| e.to_string())
+}
+
+/// Mutex 락을 잡되, 이전에 락을 쥔 스레드가 패닉해 **poison된 경우에도 복구**한다.
+/// 측정 상태는 서로 독립적인 `Copy` 필드뿐이라 깨진 불변식이 없다 → poison을 무시하고
+/// 내부 값을 그대로 쓴다(그러지 않으면 한 번 패닉 후 모든 측정 커맨드가 영구 불능이 됨).
+fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 /// 타이머 오버레이 창을 표시/숨김. 창이 없거나 실패해도 측정 자체는 계속되므로 에러는 삼킨다.
@@ -41,7 +52,7 @@ pub fn start_session(
 ) -> Result<SessionSnapshot, String> {
     let now = now_epoch();
     let snap = {
-        let mut m = state.lock().map_err(|e| e.to_string())?;
+        let mut m = lock(&state);
         if m.status != Status::Idle {
             return Err("이미 측정 중입니다.".into());
         }
@@ -66,7 +77,7 @@ pub fn pause_session(
 ) -> Result<SessionSnapshot, String> {
     let now = now_epoch();
     let snap = {
-        let mut m = state.lock().map_err(|e| e.to_string())?;
+        let mut m = lock(&state);
         if m.status != Status::Running {
             return Err("측정 중이 아니어서 일시정지할 수 없습니다.".into());
         }
@@ -86,7 +97,7 @@ pub fn resume_session(
 ) -> Result<SessionSnapshot, String> {
     let now = now_epoch();
     let snap = {
-        let mut m = state.lock().map_err(|e| e.to_string())?;
+        let mut m = lock(&state);
         if m.status != Status::Paused {
             return Err("일시정지 상태가 아닙니다.".into());
         }
@@ -106,10 +117,11 @@ pub fn resume_session(
 pub fn stop_session(
     app: AppHandle,
     state: State<'_, Mutex<Measurement>>,
+    pending: State<'_, PendingFinished>,
 ) -> Result<SessionSummary, String> {
     let now = now_epoch();
     let (summary, snap) = {
-        let mut m = state.lock().map_err(|e| e.to_string())?;
+        let mut m = lock(&state);
         if m.status == Status::Idle {
             return Err("측정 중이 아닙니다.".into());
         }
@@ -137,6 +149,11 @@ pub fn stop_session(
             snap,
         )
     };
+    // 저장 리스너(메인 창)가 아직 준비 전이어도 요약을 잃지 않도록 보관한다.
+    // 메인 창이 마운트 시 `take_pending_finished`로 배수(drain)해 저장한다
+    // (중복은 저장 계층의 자연키 검사로 방지). --autostart 초기 로드 구간의 유실 방어.
+    *lock(&pending) = Some(summary.clone());
+
     broadcast(&app, &snap)?;
     // 종료 요약을 메인 창에 전달해 세션을 저장하게 한다(저장 경로 일원화).
     app.emit(EVENT_SESSION_FINISHED, &summary)
@@ -171,7 +188,7 @@ pub fn show_quickstart(
     state: State<'_, Mutex<Measurement>>,
 ) -> Result<(), String> {
     {
-        let m = state.lock().map_err(|e| e.to_string())?;
+        let m = lock(&state);
         if m.status != Status::Idle {
             return Ok(());
         }
@@ -192,7 +209,7 @@ pub fn toggle_pause(
 ) -> Result<SessionSnapshot, String> {
     let now = now_epoch();
     let snap = {
-        let mut m = state.lock().map_err(|e| e.to_string())?;
+        let mut m = lock(&state);
         match m.status {
             Status::Running => {
                 m.status = Status::Paused;
@@ -212,12 +229,22 @@ pub fn toggle_pause(
     Ok(snap)
 }
 
+/// 종료 요약 배수(drain). 메인 창이 마운트 시/저장 후 호출해, `stop_session`이 보관해 둔
+/// 아직 저장 못 한 요약을 가져가 저장한다(있으면 Some, 없으면 None). 가져가면 비운다.
+/// 저장은 자연키 중복 검사를 거치므로 이벤트 저장과 겹쳐도 중복 INSERT되지 않는다.
+#[tauri::command]
+pub fn take_pending_finished(
+    pending: State<'_, PendingFinished>,
+) -> Result<Option<SessionSummary>, String> {
+    Ok(lock(&pending).take())
+}
+
 /// 현재 측정 상태 조회. 창이 새로 뜨거나 리로드될 때 동기화용(기획서 §5-2).
 #[tauri::command]
 pub fn get_session_state(
     state: State<'_, Mutex<Measurement>>,
 ) -> Result<SessionSnapshot, String> {
     let now = now_epoch();
-    let m = state.lock().map_err(|e| e.to_string())?;
+    let m = lock(&state);
     Ok(m.snapshot(now))
 }

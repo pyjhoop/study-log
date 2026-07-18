@@ -33,6 +33,8 @@ export interface StatBucket {
   /** 툴팁 제목(길게). 예: `7/18 (금)`, `2026년 7월` */
   tooltip: string;
   total: number;
+  /** 바로 직전(더 이전) 기간의 합계(초) — 표의 증감 계산용(창 경계와 무관). */
+  prevTotal: number;
   /** 그 기간의 세션 수. */
   count: number;
   /** 현재 기준 몇 기간 전인지(0 = 현재 기간). */
@@ -134,6 +136,26 @@ function monthKey(d: Date): string {
 }
 function sec(d: Date): number {
   return Math.floor(d.getTime() / 1000);
+}
+
+/**
+ * 진행 중 기간의 "같은 시점"을 직전 기간에서 **달력 연산**으로 찾는다(페이스 비교용).
+ * epoch 초 delta를 더하면 DST 경계에서 1시간 어긋나므로, 요일/일자+시:분:초를 직접 옮긴다.
+ * (KST는 DST가 없어 현재는 무해하지만, 다른 시간대 배포 시 정확해진다.)
+ *  - day  : 직전 날의 같은 시:분:초
+ *  - week : 직전 주의 같은 요일·시:분:초
+ *  - month: 직전 달의 같은 일(말일 초과 시 그 달 말일로 clamp)·시:분:초
+ */
+function samePointInPrev(g: Granularity, now: Date, prevStart: Date): Date {
+  const d = new Date(prevStart);
+  if (g === "week") {
+    d.setDate(d.getDate() + ((now.getDay() + 6) % 7)); // 월=0 기준 요일 오프셋
+  } else if (g === "month") {
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    d.setDate(Math.min(now.getDate(), lastDay));
+  }
+  d.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), 0);
+  return d;
 }
 
 /** 현재에서 k기간 전 기간의 시작(0시). k=0 현재, k=1 직전 … 음수면 미래. */
@@ -245,11 +267,14 @@ export function buildBuckets(
     const offset = endOffset + i;
     const start = shiftStart(g, now, offset);
     const key = bucketKey(g, start);
+    // 직전 기간 합계는 창 밖이어도 totals 맵에서 직접 찾는다 → 표 증감이 창 경계에서 끊기지 않음.
+    const prevKey = bucketKey(g, shiftStart(g, now, offset + 1));
     out.push({
       key,
       label: bucketLabel(g, start),
       tooltip: periodTitle(g, start),
       total: totals.get(key) ?? 0,
+      prevTotal: totals.get(prevKey) ?? 0,
       count: counts.get(key) ?? 0,
       offset,
       isCurrent: offset === 0,
@@ -291,8 +316,11 @@ export function focusedStats(
 
   // 이 기간 집계 구간: 진행 중이면 [start, now], 완료면 [start, next).
   const endSec = isCurrent ? nowSec + 1 : nextSec;
-  // 비교(직전) 구간의 끝: 진행 중이면 같은 시점, 완료면 이 기간 시작(= 직전 기간 전체).
-  const prevEnd = isCurrent ? Math.min(prevSec + (nowSec - startSec), startSec) : startSec;
+  // 비교(직전) 구간의 끝: 진행 중이면 직전 기간의 **같은 시점**(달력 기준), 완료면 이 기간
+  // 시작(= 직전 기간 전체). 진행 중은 startSec으로 clamp해 이 기간을 침범하지 않게 한다.
+  const prevEnd = isCurrent
+    ? Math.min(sec(samePointInPrev(g, now, prev)), startSec)
+    : startSec;
 
   let total = 0;
   let count = 0;
@@ -353,10 +381,13 @@ export function buildHeatmap(
     const weekStart = new Date(thisWeekStart);
     weekStart.setDate(weekStart.getDate() - (weeksCount - 1 - c) * 7);
     const week: HeatCell[] = [];
+    // 이 주(월~일)에 '1일'이 들어있으면 그 달이 이 열에서 시작한다(GitHub 라벨 규약).
+    let startsMonth = -1;
     for (let d = 0; d < 7; d++) {
       const day = new Date(weekStart);
       day.setDate(day.getDate() + d);
       const k = dateKey(day);
+      if (day.getDate() === 1) startsMonth = day.getMonth();
       week.push({
         key: k,
         sec: sec(day),
@@ -364,11 +395,10 @@ export function buildHeatmap(
         inRange: day.getTime() <= todayMs,
       });
     }
-    // 월 라벨: 이 주의 첫날(월요일) 기준 달이 바뀌는 열에만.
-    const m = weekStart.getMonth();
-    if (m !== prevMonth) {
-      months.push({ col: c, label: `${m + 1}월` });
-      prevMonth = m;
+    // 월 라벨: 그 달의 1일이 포함된 열에 붙인다(월요일 기준으로 한 칸 밀리지 않게).
+    if (startsMonth !== -1 && startsMonth !== prevMonth) {
+      months.push({ col: c, label: `${startsMonth + 1}월` });
+      prevMonth = startsMonth;
     }
     weeks.push(week);
   }

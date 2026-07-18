@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -31,25 +31,30 @@ function mapKey(e: KeyboardEvent): string | null {
 }
 
 /**
- * 전역 핫키 하나를 캡처하는 컨트롤. "변경"을 누르면 다음 조합을 캡처한다.
- * 반드시 수정자(Ctrl/Alt/Shift/Super)를 포함해야 하며, Esc로 취소한다.
+ * 전역 핫키 하나를 캡처하는 컨트롤(**제어형**). "변경"을 누르면 부모에 캡처 시작을 알리고,
+ * 부모(HotkeysSection)가 **한 번에 한 행만** 캡처 상태로 두어 여러 행이 동시에 키를 먹어
+ * 두 바인딩이 한 번에 덮어써지는 문제를 막는다. 반드시 수정자(Ctrl/Alt/Shift/Super)를
+ * 포함해야 하며, Esc로 취소한다.
  */
 export function HotkeyCapture({
   value,
+  capturing,
+  onCapturingChange,
   onChange,
 }: {
   value: string;
+  capturing: boolean;
+  onCapturingChange: (capturing: boolean) => void;
   onChange: (accel: string) => void;
 }) {
-  const [capturing, setCapturing] = useState(false);
-
   useEffect(() => {
     if (!capturing) return;
     const onKey = (e: KeyboardEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      e.stopImmediatePropagation(); // 같은 노드의 다른 캡처 리스너까지 차단(안전망)
       if (e.key === "Escape") {
-        setCapturing(false);
+        onCapturingChange(false);
         return;
       }
       const main = mapKey(e);
@@ -65,16 +70,16 @@ export function HotkeyCapture({
         return;
       }
       onChange([...mods, main].join("+"));
-      setCapturing(false);
+      onCapturingChange(false);
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [capturing, onChange]);
+  }, [capturing, onCapturingChange, onChange]);
 
   return (
     <button
       type="button"
-      onClick={() => setCapturing((c) => !c)}
+      onClick={() => onCapturingChange(!capturing)}
       className={cn(
         "inline-flex h-8 min-w-[9rem] items-center justify-center rounded-md border px-3 font-mono text-xs transition-colors",
         capturing
