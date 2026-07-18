@@ -1,9 +1,11 @@
 use std::sync::Mutex;
 
+use tauri::WindowEvent;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 mod commands;
 mod state;
+mod tray;
 
 use state::Measurement;
 
@@ -26,6 +28,7 @@ pub fn run() {
         // 측정 상태 단일 소스. 커맨드에서 `State<Mutex<Measurement>>`로 주입받는다.
         .manage(Mutex::new(Measurement::idle()))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(
             tauri_plugin_sql::Builder::new()
                 .add_migrations(DB_URL, migrations())
@@ -39,6 +42,21 @@ pub fn run() {
     }
 
     builder
+        // 트레이 상주(기획서 §10-2). setup에서 한 번 생성한다.
+        .setup(|app| {
+            tray::build_tray(app.handle())?;
+            Ok(())
+        })
+        // 메인 창 X → 종료 대신 트레이로 숨김(백그라운드 유지·핫키 계속 동작).
+        // 완전 종료는 트레이 "종료"(app.exit)로만.
+        .on_window_event(|window, event| {
+            if window.label() == "main" {
+                if let WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             commands::start_session,
             commands::pause_session,

@@ -7,8 +7,10 @@ import { SubjectsScreen } from "@/components/subjects/SubjectsScreen";
 import { RecordsScreen } from "@/components/records/RecordsScreen";
 import { DashboardScreen } from "@/components/dashboard/DashboardScreen";
 import { StatsScreen } from "@/components/stats/StatsScreen";
+import { SettingsScreen } from "@/components/settings/SettingsScreen";
 import { useSessionRecorder } from "@/hooks/useSessionRecorder";
 import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
+import { useTray } from "@/hooks/useTray";
 import { onFocusMain } from "@/lib/ipc";
 
 type Screen = "dashboard" | "stats" | "records" | "subjects" | "settings";
@@ -21,14 +23,6 @@ const NAV: { id: Screen; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "settings", label: "설정", icon: Settings },
 ];
 
-const PLACEHOLDER: Record<Screen, string> = {
-  dashboard: "오늘 진행 · 일/주/월 통계 · 최근 세션이 여기에 표시됩니다.",
-  stats: "일간/주간/월간 통계와 지난 기간 대비 증감이 여기에 표시됩니다.",
-  records: "학습 세션 목록(수정/삭제/수동 추가)과 메모가 여기에 표시됩니다.",
-  subjects: "과목 CRUD(이름/색/정렬/보관)가 여기에 표시됩니다.",
-  settings: "핫키 · 오버레이 · 뽀모도로 · 목표시간 설정이 여기에 표시됩니다.",
-};
-
 const SCREENS: Screen[] = ["dashboard", "stats", "records", "subjects", "settings"];
 
 export default function MainApp() {
@@ -37,6 +31,8 @@ export default function MainApp() {
 
   // 측정 종료 요약을 받아 세션을 저장하는 단일 리스너(오버레이/핫키/트레이 종료 모두 여기로).
   useSessionRecorder();
+  // 트레이 툴팁을 측정 상태에 맞춰 갱신(트레이 자체는 Rust가 소유).
+  useTray();
 
   // 메인 창을 표시·포커스하고(대시보드 핫키·피커 유도) 선택 화면으로 전환한다.
   const focusMain = useCallback((next?: Screen) => {
@@ -110,12 +106,7 @@ export default function MainApp() {
           ) : screen === "stats" ? (
             <StatsScreen />
           ) : (
-            <div className="flex h-full items-center justify-center rounded-xl border border-dashed">
-              <div className="max-w-md text-center">
-                <active.icon className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">{PLACEHOLDER[screen]}</p>
-              </div>
-            </div>
+            <SettingsScreen />
           )}
         </section>
       </main>

@@ -184,6 +184,17 @@ export async function fetchStatRows(): Promise<StatRow[]> {
   );
 }
 
+/** 오늘(로컬 날짜) 저장된 세션의 공부 시간 합계(초). 오버레이 목표% 표시용 경량 쿼리. */
+export async function fetchTodaySec(now = new Date()): Promise<number> {
+  const db = await getDb();
+  const todayStart = sec(startOfDay(now));
+  const rows = await db.select<{ total: number | null }[]>(
+    "SELECT SUM(duration_sec) AS total FROM sessions WHERE started_at >= ?",
+    [todayStart],
+  );
+  return rows[0]?.total ?? 0;
+}
+
 // ── 집계(순수 함수) ───────────────────────────────────────────────
 
 /**

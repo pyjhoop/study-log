@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "timer-capability",
-  "description": "타이머 오버레이 창 권한: 드래그 이동·우하단 크기조절, 위치/크기 조회·설정(복원), settings 읽기/쓰기",
+  "description": "타이머 오버레이 창 권한: 드래그 이동·우하단 크기조절, 위치/크기 조회·설정(복원), 항상 위 토글, settings 읽기/쓰기, 뽀모도로 알림",
   "windows": ["timer"],
   "permissions": [
     "core:default",
@@ -11,7 +11,12 @@
     "core:window:allow-inner-size",
     "core:window:allow-set-position",
     "core:window:allow-set-size",
+    "core:window:allow-set-always-on-top",
     "sql:default",
-    "sql:allow-execute"
+    "sql:allow-execute",
+    "notification:default",
+    "notification:allow-notify",
+    "notification:allow-is-permission-granted",
+    "notification:allow-request-permission"
   ]
 }

@@ -19,6 +19,10 @@ export const EVENT_SESSION_FINISHED = "session-finished";
 export const EVENT_FOCUS_MAIN = "focus-main";
 /** 세션이 실제로 DB에 저장된 뒤 알리는 이벤트(대시보드 통계 새로고침용). */
 export const EVENT_SESSION_SAVED = "session-saved";
+/** 오버레이 커스터마이즈 옵션 변경 → 타이머 창 즉시 반영. */
+export const EVENT_OVERLAY_OPTIONS_CHANGED = "overlay-options-changed";
+/** 전역 핫키 바인딩 변경 → 메인 창이 재등록. */
+export const EVENT_HOTKEYS_CHANGED = "hotkeys-changed";
 
 /** 측정 시작. Idle일 때만 성공. */
 export function startSession(subjectId: number): Promise<SessionSnapshot> {
@@ -94,4 +98,24 @@ export function onFocusMain(
   handler: (payload: { screen?: string }) => void,
 ): Promise<UnlistenFn> {
   return listen<{ screen?: string }>(EVENT_FOCUS_MAIN, (e) => handler(e.payload));
+}
+
+/** 오버레이 옵션 변경을 브로드캐스트한다(설정 화면 → 타이머 창). */
+export function emitOverlayOptionsChanged(options: unknown): Promise<void> {
+  return emit(EVENT_OVERLAY_OPTIONS_CHANGED, options);
+}
+
+/** `overlay-options-changed` 구독(타이머 창). */
+export function onOverlayOptionsChanged<T>(handler: (options: T) => void): Promise<UnlistenFn> {
+  return listen<T>(EVENT_OVERLAY_OPTIONS_CHANGED, (e) => handler(e.payload));
+}
+
+/** 핫키 바인딩 변경을 알린다(설정 화면 → 메인 창 재등록). */
+export function emitHotkeysChanged(): Promise<void> {
+  return emit(EVENT_HOTKEYS_CHANGED);
+}
+
+/** `hotkeys-changed` 구독(메인 창). */
+export function onHotkeysChanged(handler: () => void): Promise<UnlistenFn> {
+  return listen(EVENT_HOTKEYS_CHANGED, () => handler());
 }

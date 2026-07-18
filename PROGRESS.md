@@ -20,7 +20,7 @@
 | 4 | 전역 핫키 + 빠른 시작 피커 | ✅ 완료 |
 | 5 | 세션 저장 + 기록 화면 | ✅ 완료 |
 | 6 | 대시보드 통계 (일/주/월 + 오늘 목표 링) | ✅ 완료 |
-| 7 | 부가기능: 뽀모도로/목표 → 트레이 → 오버레이 커스터마이즈 + 설정 화면 | ⬜ |
+| 7 | 부가기능: 뽀모도로/목표 → 트레이 → 오버레이 커스터마이즈 + 설정 화면 | ✅ 완료 |
 | 8 | 폴리시 & 패키징 (빈 상태/에러, 아이콘, 빌드) | ⬜ |
 
 ---
@@ -44,6 +44,23 @@ npm run tauri build    # 배포 빌드 (단계 8)
 ---
 
 ## 단계별 완료 로그
+
+### ✅ 단계 7 — 부가기능(뽀모도로 · 트레이 · 오버레이 커스터마이즈 · 설정 화면) (2026-07-18)
+**한 일**
+- **시스템 트레이 + 종료 정책**(Rust, `src-tauri/src/tray.rs`): setup에서 트레이 1개 생성. 우클릭 메뉴 6종(측정 시작→`show_quickstart`/종료→`stop_session`/일시정지·재개→`toggle_pause`/오버레이 표시·숨김→`toggle_overlay`/대시보드 열기/종료→`app.exit`), **좌클릭→메인 표시·포커스**. 메뉴 동작은 기존 커맨드를 그대로 재사용(상태 판단은 Rust 단일 소스). `lib.rs` `on_window_event`로 **메인 창 X→종료 대신 `hide()`+`prevent_close`**(백그라운드 유지·핫키 계속 동작), 완전 종료는 트레이 "종료"만. 툴팁 과목/상태는 JS(`useTray`)가 `TrayIcon.getById("main-tray").setTooltip`으로 갱신(경과 초 실시간까지는 X). `tauri-plugin-notification` 추가(뽀모도로 알림용).
+- **오버레이 커스터마이즈**(`lib/overlaySettings.ts` + `hooks/useOverlayOptions.ts`): 옵션(배경색/투명도·글자색·글자크기 모드(창비례/고정)·표시항목 5종 토글·항상위)을 settings(`overlay_options`)에 저장하고, 설정 변경 시 **`overlay-options-changed` 이벤트로 타이머 창에 즉시 반영**(실시간 미리보기처럼). `TimerOverlay`가 옵션을 적용(배경 `hexToRgba`, 글자색/크기, 항목 조건부 표시, `setAlwaysOnTop`). 목표% 표시용 경량 쿼리 `fetchTodaySec`(stats.ts) 추가.
+- **뽀모도로**(`lib/pomodoro.ts` + `hooks/usePomodoro.ts`, **오버레이 창 컨트롤러**): 설정(집중/짧은휴식/긴휴식/긴휴식주기/알림). **핵심 모델 — 휴식 = 측정 세션의 자동 일시정지**: 집중 목표만큼 공부가 쌓이면 `pause_session`(휴식 시작), 휴식 시간이 지나면 `resume_session`(다음 집중). 측정 엔진이 이미 일시정지 시간을 제외하므로 **세션 하나의 duration이 곧 집중 시간 합계**(집중만 적립) → **Rust 측정 엔진 변경 없음**. 전환 시 데스크톱 알림, 오버레이는 **남은 시간 카운트다운 + 사이클(집중N/휴식/긴휴식)** 표시(휴식은 sky 색). 컨트롤러를 **항상 표시되는 오버레이 창**에 둔 이유: 숨겨진 창의 JS 타이머 스로틀을 피해 전환이 안정적. (진행 상태는 메모리라 측정 중 창 리로드 시 현재 집중 블록부터 새로 셈 — 허용 오차.)
+- **설정 화면**(`components/settings/`): `SettingsScreen` = 목표시간 · 뽀모도로 · 오버레이 · 전역 핫키 · 일반(트레이 안내) 5개 카드 섹션. 공용 `parts.tsx`(Section/Row/NumberField), `ui/Switch.tsx`(경량 토글). **핫키 재바인딩**: `HotkeyCapture`(키 조합 캡처, 수정자 필수·Esc 취소), 저장 시 중복 검사 후 `hotkeys-changed` 이벤트 → `useGlobalShortcuts`가 **재등록**(이미 점유된 조합은 toast 안내). 오버레이/뽀모도로/목표는 변경 즉시 저장.
+- **연결**: `MainApp` 설정 탭 placeholder → `<SettingsScreen/>`, `useTray()` 추가. `useGlobalShortcuts`는 `hotkeys-changed` 구독으로 재등록(콜백은 ref로 안정화). `ipc.ts`에 `overlay-options-changed`/`hotkeys-changed` emit·listen 추가.
+- **권한**: `main.json`에 `core:tray:allow-get-by-id`/`allow-set-tooltip`. `timer.json`에 `core:window:allow-set-always-on-top` + `notification:*`(notify/is-permission-granted/request-permission). 트레이 메뉴·종료 정책은 Rust 네이티브라 capabilities 불필요.
+
+**검증 결과**
+- `npm run build` ✅ (tsc + vite, 2256 모듈) · `cargo check` ✅ (경고·에러 0, notification 플러그인 다운로드/컴파일 + tauri-build capabilities 검증 통과).
+- ⏳ 런타임 E2E는 **사용자 테스트 대기** — `npm run tauri dev` 후:
+  - **트레이**: 메인 창 X→트레이로 숨김(창 사라져도 앱 유지)·좌클릭으로 복귀, 우클릭 메뉴 각 항목(시작 피커/종료/일시정지·재개/오버레이/대시보드), 측정 중 트레이 툴팁에 "측정 중 · 과목", **"종료"로만 완전 종료**, 숨긴 상태에서도 핫키 동작.
+  - **뽀모도로**: 설정에서 켜고 집중 1분·휴식 1분 등 짧게 → 측정 시작 시 오버레이가 카운트다운+"집중 1", 집중 끝나면 알림+자동 휴식(오버레이 sky·카운트다운), 휴식 끝나면 알림+다음 집중, 종료 시 **집중 시간만** 세션에 적립(휴식 제외).
+  - **오버레이 커스터마이즈**: 설정에서 투명도/색/글자크기/표시항목/항상위 바꾸면 측정 중 오버레이가 **즉시** 반영, 목표% 표시 토글.
+  - **핫키 재바인딩**: 설정에서 조합 변경→저장→새 조합 동작(옛 조합 해제), 중복·점유 조합 안내(toast).
 
 ### ✅ 단계 6 — 대시보드 통계 (2026-07-18)
 **한 일**
@@ -156,27 +173,28 @@ npm run tauri build    # 배포 빌드 (단계 8)
 src/
   main.tsx                 # window.label 분기 진입점
   index.css                # Tailwind + 테마 토큰
-  windows/                 # MainApp(대시보드/통계/기록/과목/저장리스너/핫키등록) / TimerOverlay(완성) / QuickStart(피커 완성)
-  hooks/{useSubjects,useSessions,useSession,useStats,useOverlayWindow,useSessionRecorder,useGlobalShortcuts}.ts
-  #   과목목록 / 세션목록 / 측정상태구독 / 대시보드통계(행+목표+session-saved구독) / 오버레이 위치·크기 / 종료→저장 리스너 / 전역핫키 등록(메인 창)
-  lib/{utils,db,types,subjects,ipc,sessions,stats,time,settings,hotkeys}.ts
-  #   cn / DB연결 / 타입 / 과목CRUD / invoke·event래퍼(+showQuickstart/togglePause/focus-main/session-saved) / 세션 저장·조회·수정·삭제 / 통계 집계(일주월버킷·과목분포·연속일·페이스비교) / 경과·날짜·duration·증감계산 / settings K-V / 핫키
+  windows/                 # MainApp(대시보드/통계/기록/과목/설정/저장리스너/핫키등록/트레이툴팁) / TimerOverlay(옵션·뽀모도로 반영) / QuickStart(피커)
+  hooks/{useSubjects,useSessions,useSession,useStats,useOverlayWindow,useOverlayOptions,usePomodoro,useSessionRecorder,useGlobalShortcuts,useTray}.ts
+  #   과목/세션목록 / 측정상태구독 / 대시보드통계 / 오버레이 위치·크기 / 오버레이 옵션 구독 / 뽀모도로 컨트롤러(오버레이) / 종료→저장 / 전역핫키 등록·재등록 / 트레이 툴팁
+  lib/{utils,db,types,subjects,ipc,sessions,stats,time,settings,hotkeys,overlaySettings,pomodoro}.ts
+  #   cn / DB / 타입 / 과목CRUD / invoke·event래퍼(+overlay-options-changed/hotkeys-changed) / 세션CRUD / 통계집계(+fetchTodaySec) / 시간 / settings K-V / 핫키 / 오버레이옵션 / 뽀모도로설정
   components/
-    ui/{button,input,Modal,ConfirmDialog}.tsx
+    ui/{button,input,Switch,Modal,ConfirmDialog}.tsx
     subjects/{SubjectsScreen,SubjectEditor}.tsx
     records/{RecordsScreen,SessionEditor}.tsx   # 세션 일별 목록/수정/삭제/수동 추가·메모
     dashboard/{DashboardScreen,LiveMeasure,GoalRing,StudyBarChart,SubjectDonut}.tsx  # 통합 요약 대시보드(Recharts)
     stats/{StatsScreen,ComparisonCard,PeriodTable}.tsx  # 일/주/월 통계 + 지난 기간 같은 시점 대비 증감
+    settings/{SettingsScreen,parts,GoalSection,PomodoroSection,OverlaySection,HotkeysSection,HotkeyCapture,GeneralSection}.tsx  # 설정 5섹션 + 핫키 캡처
 src-tauri/
   src/
-    lib.rs                 # 플러그인 초기화 + 마이그레이션 + manage(상태) + invoke_handler
+    lib.rs                 # 플러그인(sql/global-shortcut/notification) + 마이그레이션 + manage + setup(트레이) + on_window_event(X→트레이) + invoke_handler
     main.rs
     state.rs               # Measurement(측정 상태 단일 소스) + Status + 스냅샷/요약
     commands.rs            # start/pause/resume/stop/get_session_state/toggle_overlay/show_quickstart/toggle_pause
                            #   (+ session-changed/session-finished emit, 시작·종료 시 오버레이 show/hide)
-                           # (tray.rs는 단계 7)
+    tray.rs                # 트레이 아이콘·메뉴(6종)·좌클릭 복귀 (종료 정책은 lib.rs on_window_event)
   migrations/0001_init.sql # subjects/sessions/settings
-  capabilities/{main,timer,quickstart}.json   # main:sql+global-shortcut+자기창제어 / quickstart:hide
+  capabilities/{main,timer,quickstart}.json   # main:sql+global-shortcut+자기창제어+트레이툴팁 / timer:창제어+always-on-top+notification / quickstart:hide
   tauri.conf.json          # 3-창 + productName/identifier
   Cargo.toml
 docs/                      # 기획/결정 문서
