@@ -139,7 +139,7 @@ export default function TimerOverlay() {
         )}
 
         {/* 시간 + 서브라인 (드래그가 잡히도록 pointer-events 차단) */}
-        <div className="pointer-events-none flex min-w-0 flex-col leading-none">
+        <div className="pointer-events-none flex min-w-0 flex-1 flex-col leading-none">
           {options.show.time && (
             <span
               className="font-mono font-semibold tabular-nums"
@@ -150,7 +150,7 @@ export default function TimerOverlay() {
           )}
           {subline && (
             <span
-              className="mt-0.5 max-w-[45vw] truncate text-[10px]"
+              className="mt-0.5 truncate text-[10px]"
               style={{ color: options.textColor, opacity: 0.7 }}
             >
               {subline}
