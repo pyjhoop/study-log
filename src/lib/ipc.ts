@@ -13,6 +13,8 @@ import type { SessionSnapshot, SessionSummary } from "./types";
 
 /** 상태 변경 브로드캐스트 이벤트 이름(Rust와 일치). */
 export const EVENT_SESSION_CHANGED = "session-changed";
+/** 측정 종료 시 요약을 실어 보내는 이벤트(메인 창이 받아 세션 저장). */
+export const EVENT_SESSION_FINISHED = "session-finished";
 
 /** 측정 시작. Idle일 때만 성공. */
 export function startSession(subjectId: number): Promise<SessionSnapshot> {
@@ -39,9 +41,21 @@ export function getSessionState(): Promise<SessionSnapshot> {
   return invoke<SessionSnapshot>("get_session_state");
 }
 
+/** 타이머 오버레이 표시/숨김 토글. 반환값은 토글 후 표시 여부. */
+export function toggleOverlay(): Promise<boolean> {
+  return invoke<boolean>("toggle_overlay");
+}
+
 /** `session-changed` 구독. 반환된 함수를 호출하면 구독 해제. */
 export function onSessionChanged(
   handler: (snapshot: SessionSnapshot) => void,
 ): Promise<UnlistenFn> {
   return listen<SessionSnapshot>(EVENT_SESSION_CHANGED, (e) => handler(e.payload));
+}
+
+/** `session-finished` 구독(측정 종료 요약). 메인 창이 이 요약으로 세션을 저장한다. */
+export function onSessionFinished(
+  handler: (summary: SessionSummary) => void,
+): Promise<UnlistenFn> {
+  return listen<SessionSummary>(EVENT_SESSION_FINISHED, (e) => handler(e.payload));
 }

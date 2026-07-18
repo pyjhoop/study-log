@@ -1,9 +1,17 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "timer-capability",
-  "description": "타이머 오버레이 창 권한 (이동/크기조절/표시 제어는 단계 3에서 추가)",
+  "description": "타이머 오버레이 창 권한: 드래그 이동·우하단 크기조절, 위치/크기 조회·설정(복원), settings 읽기/쓰기",
   "windows": ["timer"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-start-resize-dragging",
+    "core:window:allow-outer-position",
+    "core:window:allow-inner-size",
+    "core:window:allow-set-position",
+    "core:window:allow-set-size",
+    "sql:default",
+    "sql:allow-execute"
   ]
 }

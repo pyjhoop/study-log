@@ -5,17 +5,29 @@
 //! 잘못된 상태 전이(예: 측정 중 시작)는 조용히 무시하지 않고 에러 메시지로 돌려준다.
 
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::state::{now_epoch, Measurement, SessionSnapshot, SessionSummary, Status};
 
 /// 상태 변경 브로드캐스트 이벤트 이름(kebab-case 규약).
 const EVENT_SESSION_CHANGED: &str = "session-changed";
+/// 측정 종료 시 요약을 실어 보내는 이벤트. **메인 창이 받아 세션을 저장**한다
+/// (핫키·트레이·오버레이 어디서 종료해도 저장 경로가 하나가 되도록 — 기획서 §5-2).
+const EVENT_SESSION_FINISHED: &str = "session-finished";
+/// 항상-위 타이머 오버레이 창 라벨(tauri.conf.json과 일치).
+const TIMER_LABEL: &str = "timer";
 
 /// 현재 스냅샷을 모든 창에 emit. 락을 잡은 채로 호출하지 말 것(먼저 drop 후 emit).
 fn broadcast(app: &AppHandle, snap: &SessionSnapshot) -> Result<(), String> {
     app.emit(EVENT_SESSION_CHANGED, snap)
         .map_err(|e| e.to_string())
+}
+
+/// 타이머 오버레이 창을 표시/숨김. 창이 없거나 실패해도 측정 자체는 계속되므로 에러는 삼킨다.
+fn set_overlay_visible(app: &AppHandle, visible: bool) {
+    if let Some(win) = app.get_webview_window(TIMER_LABEL) {
+        let _ = if visible { win.show() } else { win.hide() };
+    }
 }
 
 /// 측정 시작. Idle일 때만 Running으로 전환한다.
@@ -39,6 +51,8 @@ pub fn start_session(
         m.snapshot(now)
     };
     broadcast(&app, &snap)?;
+    // 측정 시작 시 오버레이 자동 표시(기획서 §8-2).
+    set_overlay_visible(&app, true);
     Ok(snap)
 }
 
@@ -122,7 +136,28 @@ pub fn stop_session(
         )
     };
     broadcast(&app, &snap)?;
+    // 종료 요약을 메인 창에 전달해 세션을 저장하게 한다(저장 경로 일원화).
+    app.emit(EVENT_SESSION_FINISHED, &summary)
+        .map_err(|e| e.to_string())?;
+    // 종료 시 오버레이 자동 숨김(기획서 §8-2).
+    set_overlay_visible(&app, false);
     Ok(summary)
+}
+
+/// 타이머 오버레이 표시/숨김 토글. 반환값은 토글 후 표시 여부.
+/// 단계 4의 오버레이 핫키(`Ctrl+Alt+H`)·단계 7 트레이 메뉴가 재사용한다.
+#[tauri::command]
+pub fn toggle_overlay(app: AppHandle) -> Result<bool, String> {
+    let win = app
+        .get_webview_window(TIMER_LABEL)
+        .ok_or_else(|| "타이머 창을 찾을 수 없습니다.".to_string())?;
+    let visible = win.is_visible().map_err(|e| e.to_string())?;
+    if visible {
+        win.hide().map_err(|e| e.to_string())?;
+    } else {
+        win.show().map_err(|e| e.to_string())?;
+    }
+    Ok(!visible)
 }
 
 /// 현재 측정 상태 조회. 창이 새로 뜨거나 리로드될 때 동기화용(기획서 §5-2).

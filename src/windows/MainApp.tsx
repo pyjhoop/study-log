@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import { cn } from "@/lib/utils";
 import { SubjectsScreen } from "@/components/subjects/SubjectsScreen";
 import { SessionTester } from "@/components/session/SessionTester";
+import { useSessionRecorder } from "@/hooks/useSessionRecorder";
 
 type Screen = "dashboard" | "records" | "subjects" | "settings";
 
@@ -24,6 +25,9 @@ const PLACEHOLDER: Record<Screen, string> = {
 export default function MainApp() {
   const [screen, setScreen] = useState<Screen>("dashboard");
   const active = NAV.find((n) => n.id === screen)!;
+
+  // 측정 종료 요약을 받아 세션을 저장하는 단일 리스너(오버레이/핫키/트레이 종료 모두 여기로).
+  useSessionRecorder();
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">

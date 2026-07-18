@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Play, Pause, Square, RotateCcw, Circle } from "lucide-react";
+import { Play, Pause, Square, RotateCcw, Circle, Monitor } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/hooks/useSession";
 import { useSubjects } from "@/hooks/useSubjects";
-import { saveSession } from "@/lib/sessions";
+import { toggleOverlay } from "@/lib/ipc";
 import { formatHMS } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
@@ -47,17 +47,8 @@ export function SessionTester() {
       await start(startId);
     });
 
-  const handleStop = () =>
-    guard(async () => {
-      const summary = await stop();
-      const saved = await saveSession(summary);
-      const name = subjects.find((s) => s.id === summary.subject_id)?.name ?? "과목";
-      if (saved) {
-        toast.success(`세션 저장: ${name} · ${formatHMS(summary.duration_sec)}`);
-      } else {
-        toast.info("공부 시간이 0초여서 저장하지 않았습니다.");
-      }
-    });
+  // 종료만 트리거한다. 세션 저장·토스트는 메인 창의 useSessionRecorder가 일원화해 처리한다.
+  const handleStop = () => guard(async () => void (await stop()));
 
   return (
     <div className="mx-auto flex max-w-md flex-col gap-5 rounded-xl border bg-card/40 p-6">
@@ -121,8 +112,18 @@ export function SessionTester() {
         </div>
       )}
 
+      <Button
+        variant="ghost"
+        className="h-8 text-xs text-muted-foreground"
+        onClick={() => guard(() => toggleOverlay())}
+        disabled={busy}
+      >
+        <Monitor className="h-3.5 w-3.5" /> 오버레이 표시/숨김
+      </Button>
+
       <p className="text-center text-xs text-muted-foreground">
-        상태는 Rust가 단일 소스로 관리하며, 창을 새로 열거나 새로고침해도 복구됩니다.
+        측정 시작 시 오버레이가 자동으로 뜨고 종료 시 사라집니다. 상태는 Rust가 단일 소스로
+        관리하며, 창을 새로 열거나 새로고침해도 복구됩니다.
       </p>
     </div>
   );

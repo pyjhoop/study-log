@@ -17,6 +17,17 @@ export async function listSubjects(includeArchived = false): Promise<Subject[]> 
   );
 }
 
+/** 과목 1건 조회(id). 오버레이가 측정 중인 과목 이름/색을 표시할 때 사용. 없으면 null. */
+export async function getSubject(id: number): Promise<Subject | null> {
+  const db = await getDb();
+  const rows = await db.select<Subject[]>(
+    `SELECT id, name, color, sort_order, archived, created_at
+       FROM subjects WHERE id = ?`,
+    [id],
+  );
+  return rows[0] ?? null;
+}
+
 /** 과목 생성. sort_order는 현재 최대값 + 1로 맨 끝에 붙인다. */
 export async function createSubject(input: SubjectInput): Promise<void> {
   const db = await getDb();

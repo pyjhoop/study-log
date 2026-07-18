@@ -16,7 +16,7 @@
 | 0 | 스캐폴딩 (Tauri v2 + React/TS + Tailwind + shadcn/ui, 3-창, capabilities 골격) | ✅ 완료 |
 | 1 | DB 계층(tauri-plugin-sql + 마이그레이션) + 과목 CRUD/관리 화면 | ✅ 완료 |
 | 2 | 측정 엔진 (Rust 상태/커맨드/이벤트) — 임시 버튼 검증 | ✅ 완료 |
-| 3 | 타이머 오버레이 창 (드래그·크기조절·숨김/표시·위치 복원) | ⬜ |
+| 3 | 타이머 오버레이 창 (드래그·크기조절·숨김/표시·위치 복원) | ✅ 완료 |
 | 4 | 전역 핫키 + 빠른 시작 피커 | ⬜ |
 | 5 | 세션 저장 + 기록 화면 | ⬜ |
 | 6 | 대시보드 통계 (일/주/월 + 오늘 목표 링) | ⬜ |
@@ -44,6 +44,21 @@ npm run tauri build    # 배포 빌드 (단계 8)
 ---
 
 ## 단계별 완료 로그
+
+### ✅ 단계 3 — 타이머 오버레이 창 (2026-07-18)
+**한 일**
+- **오버레이 표시/숨김을 Rust가 자동 제어**: `commands.rs` `start_session` 성공 시 `timer` 창 `show()`, `stop_session` 시 `hide()`(기획서 §8-2). `get_webview_window("timer")` 사용(`use tauri::Manager`). 실패해도 측정은 계속되게 에러는 삼킴(`set_overlay_visible`).
+- **종료 저장 경로 일원화**: `stop_session`이 요약을 `session-finished` 이벤트로도 emit. **메인 창의 `useSessionRecorder`가 유일한 저장 리스너**로 받아 `saveSession`+toast 수행 → 오버레이·(이후)핫키·트레이 어디서 종료해도 저장이 한 곳으로 모임. 기존 `SessionTester`의 종료 시 직접 저장 로직은 제거(중복 저장 방지, 종료만 트리거).
+- **`toggle_overlay` 커맨드 추가**(반환: 토글 후 표시 여부) — 단계 4 오버레이 핫키·단계 7 트레이가 재사용. `lib.rs` `invoke_handler`에 등록. (커스텀 커맨드는 capabilities 권한 불필요.)
+- **오버레이 창 UI**(`windows/TimerOverlay.tsx`): `useSession`으로 라이브 `HH:MM:SS`, 과목 색점+이름, 일시정지 시 앰버색·깜빡임. 알약 전체가 `data-tauri-drag-region`(내부 텍스트는 `pointer-events-none`로 드래그 위임), 우하단 그립 `startResizeDragging('SouthEast')`, **마우스 오버 시에만** 일시정지/재개·종료 미니 컨트롤 노출.
+- **위치·크기 복원**(`hooks/useOverlayWindow.ts`): 마운트 시 `settings`의 `overlay_geometry`(물리 px) 읽어 `setSize`/`setPosition`으로 복원, 이동/크기조절 이벤트를 400ms 디바운스로 저장. 복원 중 되쓰기 방지 플래그.
+- **설정 K-V 계층**(`lib/settings.ts`): `getSetting`/`setSetting`(JSON, upsert, `?` 바인딩). `lib/subjects.ts`에 `getSubject(id)` 추가.
+- **권한**: `capabilities/timer.json`에 창 이동/크기(`start-dragging`/`start-resize-dragging`/`outer-position`/`inner-size`/`set-position`/`set-size`) + `sql:default`+`sql:allow-execute`(오버레이가 자기 위치/과목명 조회) 최소 권한 추가.
+- **IPC 래퍼**: `lib/ipc.ts`에 `EVENT_SESSION_FINISHED`/`onSessionFinished`/`toggleOverlay`. `SessionTester`에 "오버레이 표시/숨김" 토글 버튼(수동 검증용).
+
+**검증 결과**
+- `npm run build` ✅ (tsc + vite) · `cargo check` ✅ (경고·에러 0)
+- ⏳ 런타임 E2E는 **사용자 테스트 대기** — `npm run tauri dev` 후: 측정 시작 시 오버레이 자동 표시, 다른 앱 위 항상 표시, **드래그 이동**·**우하단 크기조절**, 마우스 오버 시 일시정지/종료 버튼, 종료 시 자동 사라짐+"세션 저장" toast(메인), **앱 재실행 시 위치·크기 복원**, "오버레이 표시/숨김" 버튼 토글.
 
 ### ✅ 단계 2 — 측정 엔진 (Rust 상태/커맨드/이벤트) (2026-07-18)
 **한 일**
@@ -94,20 +109,22 @@ npm run tauri build    # 배포 빌드 (단계 8)
 src/
   main.tsx                 # window.label 분기 진입점
   index.css                # Tailwind + 테마 토큰
-  windows/                 # MainApp(대시보드=측정검증 / 과목 화면 연결) / TimerOverlay / QuickStart
-  hooks/{useSubjects,useSession}.ts   # 과목 목록 / 측정 상태 구독 훅
-  lib/{utils,db,types,subjects,ipc,sessions,time}.ts
-  #   cn / DB연결 / 타입 / 과목CRUD / invoke·event래퍼 / 세션저장 / 경과계산·포맷
+  windows/                 # MainApp(대시보드=측정검증/과목/저장리스너) / TimerOverlay(오버레이 완성) / QuickStart
+  hooks/{useSubjects,useSession,useOverlayWindow,useSessionRecorder}.ts
+  #   과목목록 / 측정상태구독 / 오버레이 위치·크기 저장·복원 / 종료→세션저장 단일 리스너
+  lib/{utils,db,types,subjects,ipc,sessions,time,settings}.ts
+  #   cn / DB연결 / 타입 / 과목CRUD·getSubject / invoke·event래퍼(+finished/toggleOverlay) / 세션저장 / 경과계산·포맷 / settings K-V
   components/
     ui/{button,input,Modal,ConfirmDialog}.tsx
     subjects/{SubjectsScreen,SubjectEditor}.tsx
-    session/SessionTester.tsx          # 단계 2 임시 검증 패널(단계 3·6에서 오버레이/대시보드로 대체)
+    session/SessionTester.tsx          # 단계 2 임시 검증 패널(+오버레이 토글 버튼, 단계 6에서 대시보드로 대체)
 src-tauri/
   src/
     lib.rs                 # 플러그인 초기화 + 마이그레이션 + manage(상태) + invoke_handler
     main.rs
     state.rs               # Measurement(측정 상태 단일 소스) + Status + 스냅샷/요약
-    commands.rs            # start/pause/resume/stop/get_session_state (+ session-changed emit)
+    commands.rs            # start/pause/resume/stop/get_session_state/toggle_overlay
+                           #   (+ session-changed/session-finished emit, 시작·종료 시 오버레이 show/hide)
                            # (tray.rs는 단계 7)
   migrations/0001_init.sql # subjects/sessions/settings
   capabilities/{main,timer,quickstart}.json   # main에 sql:allow-execute 추가됨
