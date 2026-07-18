@@ -1,12 +1,18 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main-capability",
-  "description": "메인 창(대시보드/기록/과목/설정) 권한",
+  "description": "메인 창(대시보드/기록/과목/설정) 권한: DB, 전역 핫키 등록/해제, 대시보드 핫키용 자기 창 표시·포커스",
   "windows": ["main"],
   "permissions": [
     "core:default",
     "opener:default",
     "sql:default",
-    "sql:allow-execute"
+    "sql:allow-execute",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+    "global-shortcut:allow-unregister-all",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
+    "core:window:allow-unminimize"
   ]
 }

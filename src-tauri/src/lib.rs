@@ -46,6 +46,8 @@ pub fn run() {
             commands::stop_session,
             commands::get_session_state,
             commands::toggle_overlay,
+            commands::show_quickstart,
+            commands::toggle_pause,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { SessionSnapshot, SessionSummary } from "./types";
 
 /**
@@ -15,6 +15,8 @@ import type { SessionSnapshot, SessionSummary } from "./types";
 export const EVENT_SESSION_CHANGED = "session-changed";
 /** 측정 종료 시 요약을 실어 보내는 이벤트(메인 창이 받아 세션 저장). */
 export const EVENT_SESSION_FINISHED = "session-finished";
+/** 메인 창을 표시·포커스(+선택 화면 전환) 요청 이벤트. 대시보드 핫키·피커 빈 상태 유도에서 사용. */
+export const EVENT_FOCUS_MAIN = "focus-main";
 
 /** 측정 시작. Idle일 때만 성공. */
 export function startSession(subjectId: number): Promise<SessionSnapshot> {
@@ -46,6 +48,16 @@ export function toggleOverlay(): Promise<boolean> {
   return invoke<boolean>("toggle_overlay");
 }
 
+/** 빠른 시작 피커 표시(Idle일 때만 — Idle 가드는 Rust에서). 시작 핫키가 호출. */
+export function showQuickstart(): Promise<void> {
+  return invoke<void>("show_quickstart");
+}
+
+/** 일시정지/재개 토글. Running↔Paused, Idle이면 에러. */
+export function togglePause(): Promise<SessionSnapshot> {
+  return invoke<SessionSnapshot>("toggle_pause");
+}
+
 /** `session-changed` 구독. 반환된 함수를 호출하면 구독 해제. */
 export function onSessionChanged(
   handler: (snapshot: SessionSnapshot) => void,
@@ -58,4 +70,16 @@ export function onSessionFinished(
   handler: (summary: SessionSummary) => void,
 ): Promise<UnlistenFn> {
   return listen<SessionSummary>(EVENT_SESSION_FINISHED, (e) => handler(e.payload));
+}
+
+/** 메인 창 표시·포커스 요청을 보낸다(다른 창에서 호출). screen 지정 시 해당 화면으로 전환. */
+export function requestFocusMain(screen?: string): Promise<void> {
+  return emit(EVENT_FOCUS_MAIN, { screen });
+}
+
+/** `focus-main` 구독(메인 창에서). 표시·포커스하고 screen이 있으면 그 화면으로 전환. */
+export function onFocusMain(
+  handler: (payload: { screen?: string }) => void,
+): Promise<UnlistenFn> {
+  return listen<{ screen?: string }>(EVENT_FOCUS_MAIN, (e) => handler(e.payload));
 }

@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { LayoutDashboard, ListChecks, BookOpen, Settings } from "lucide-react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Toaster } from "sonner";
 import { cn } from "@/lib/utils";
 import { SubjectsScreen } from "@/components/subjects/SubjectsScreen";
 import { SessionTester } from "@/components/session/SessionTester";
 import { useSessionRecorder } from "@/hooks/useSessionRecorder";
+import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
+import { onFocusMain } from "@/lib/ipc";
 
 type Screen = "dashboard" | "records" | "subjects" | "settings";
 
@@ -22,12 +25,43 @@ const PLACEHOLDER: Record<Screen, string> = {
   settings: "핫키 · 오버레이 · 뽀모도로 · 목표시간 설정이 여기에 표시됩니다.",
 };
 
+const SCREENS: Screen[] = ["dashboard", "records", "subjects", "settings"];
+
 export default function MainApp() {
   const [screen, setScreen] = useState<Screen>("dashboard");
   const active = NAV.find((n) => n.id === screen)!;
 
   // 측정 종료 요약을 받아 세션을 저장하는 단일 리스너(오버레이/핫키/트레이 종료 모두 여기로).
   useSessionRecorder();
+
+  // 메인 창을 표시·포커스하고(대시보드 핫키·피커 유도) 선택 화면으로 전환한다.
+  const focusMain = useCallback((next?: Screen) => {
+    const win = getCurrentWindow();
+    void win.unminimize().catch(() => {});
+    void win.show().catch(() => {});
+    void win.setFocus().catch(() => {});
+    if (next) setScreen(next);
+  }, []);
+
+  // 대시보드 핫키(Ctrl+Alt+D): 메인 창 표시·포커스 + 대시보드 화면.
+  const onDashboard = useCallback(() => focusMain("dashboard"), [focusMain]);
+  useGlobalShortcuts(onDashboard);
+
+  // 다른 창(피커 등)의 `focus-main` 요청 처리 — 표시·포커스(+화면 전환).
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void onFocusMain(({ screen: next }) => {
+      focusMain(SCREENS.includes(next as Screen) ? (next as Screen) : undefined);
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlisten = fn;
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [focusMain]);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">

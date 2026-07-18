@@ -16,6 +16,8 @@ const EVENT_SESSION_CHANGED: &str = "session-changed";
 const EVENT_SESSION_FINISHED: &str = "session-finished";
 /// 항상-위 타이머 오버레이 창 라벨(tauri.conf.json과 일치).
 const TIMER_LABEL: &str = "timer";
+/// 빠른 시작 피커 창 라벨(tauri.conf.json과 일치).
+const QUICKSTART_LABEL: &str = "quickstart";
 
 /// 현재 스냅샷을 모든 창에 emit. 락을 잡은 채로 호출하지 말 것(먼저 drop 후 emit).
 fn broadcast(app: &AppHandle, snap: &SessionSnapshot) -> Result<(), String> {
@@ -158,6 +160,56 @@ pub fn toggle_overlay(app: AppHandle) -> Result<bool, String> {
         win.show().map_err(|e| e.to_string())?;
     }
     Ok(!visible)
+}
+
+/// 시작 핫키(`Ctrl+Alt+S`)용: **Idle일 때만** 빠른 시작 피커를 표시·포커스한다.
+/// 측정 중이면 조용히 무시한다(기획서 §6 "상태에 맞지 않는 입력은 무시").
+/// Idle 가드를 Rust(단일 소스)에 두어 프론트가 상태를 몰라도 되게 한다.
+#[tauri::command]
+pub fn show_quickstart(
+    app: AppHandle,
+    state: State<'_, Mutex<Measurement>>,
+) -> Result<(), String> {
+    {
+        let m = state.lock().map_err(|e| e.to_string())?;
+        if m.status != Status::Idle {
+            return Ok(());
+        }
+    }
+    if let Some(win) = app.get_webview_window(QUICKSTART_LABEL) {
+        win.show().map_err(|e| e.to_string())?;
+        win.set_focus().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// 일시정지/재개 토글(일시정지 핫키 `Ctrl+Alt+P`·단계 7 트레이용). Running↔Paused.
+/// pause/resume 로직을 한 커맨드로 합쳐 프론트가 현재 상태를 알 필요 없게 한다.
+#[tauri::command]
+pub fn toggle_pause(
+    app: AppHandle,
+    state: State<'_, Mutex<Measurement>>,
+) -> Result<SessionSnapshot, String> {
+    let now = now_epoch();
+    let snap = {
+        let mut m = state.lock().map_err(|e| e.to_string())?;
+        match m.status {
+            Status::Running => {
+                m.status = Status::Paused;
+                m.paused_at = Some(now);
+            }
+            Status::Paused => {
+                if let Some(p) = m.paused_at.take() {
+                    m.accumulated_paused_sec += (now - p).max(0);
+                }
+                m.status = Status::Running;
+            }
+            Status::Idle => return Err("측정 중이 아닙니다.".into()),
+        }
+        m.snapshot(now)
+    };
+    broadcast(&app, &snap)?;
+    Ok(snap)
 }
 
 /// 현재 측정 상태 조회. 창이 새로 뜨거나 리로드될 때 동기화용(기획서 §5-2).

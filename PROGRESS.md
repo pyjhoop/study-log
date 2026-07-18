@@ -17,7 +17,7 @@
 | 1 | DB 계층(tauri-plugin-sql + 마이그레이션) + 과목 CRUD/관리 화면 | ✅ 완료 |
 | 2 | 측정 엔진 (Rust 상태/커맨드/이벤트) — 임시 버튼 검증 | ✅ 완료 |
 | 3 | 타이머 오버레이 창 (드래그·크기조절·숨김/표시·위치 복원) | ✅ 완료 |
-| 4 | 전역 핫키 + 빠른 시작 피커 | ⬜ |
+| 4 | 전역 핫키 + 빠른 시작 피커 | ✅ 완료 |
 | 5 | 세션 저장 + 기록 화면 | ⬜ |
 | 6 | 대시보드 통계 (일/주/월 + 오늘 목표 링) | ⬜ |
 | 7 | 부가기능: 뽀모도로/목표 → 트레이 → 오버레이 커스터마이즈 + 설정 화면 | ⬜ |
@@ -44,6 +44,19 @@ npm run tauri build    # 배포 빌드 (단계 8)
 ---
 
 ## 단계별 완료 로그
+
+### ✅ 단계 4 — 전역 핫키 + 빠른 시작 피커 (2026-07-18)
+**한 일**
+- **핫키 등록은 메인 창 JS**(`@tauri-apps/plugin-global-shortcut`)에서 수행(`hooks/useGlobalShortcuts.ts`). 마운트 시 `loadHotkeys()`로 바인딩 읽어 `unregisterAll()` 후 5종 `register()`. 콜백은 **Pressed 상태만** 처리(플러그인이 Press/Release 양쪽 호출). 등록 실패(조합 점유)는 `console.warn`만 — 사용자 안내/재바인딩 UI는 단계 7 설정 화면.
+- **핸들러를 정적으로** 유지하려고 **상태 판단을 전부 Rust에 위임**: `commands.rs`에 ① `show_quickstart`(Idle일 때만 `quickstart` 창 show+set_focus, 아니면 무시), ② `toggle_pause`(Running↔Paused 한 커맨드로 통합) 추가. 종료는 기존 `stop_session`(Idle이면 Rust가 거절→JS는 swallow). 덕분에 JS가 측정 상태를 추적할 필요 없음. `lib.rs` invoke_handler에 2개 등록.
+- **5종 핫키**(기획서 §6, 기본값 `lib/hotkeys.ts`): 시작 `Ctrl+Alt+S`→피커 / 종료 `Ctrl+Alt+E` / 정지·재개 `Ctrl+Alt+P` / 대시보드 `Ctrl+Alt+D`→메인 표시·포커스 / 오버레이 `Ctrl+Alt+H`→`toggle_overlay`. 바인딩은 `settings`의 `hotkeys` 키(JSON), 누락 키는 기본값 병합.
+- **빠른 시작 피커**(`windows/QuickStart.tsx`): 과목 목록+검색 필터, `↑/↓` 순환 이동+`Enter`, **숫자키 1~9 즉시 선택**(preventDefault로 입력창에 안 들어감), `Esc` 취소. 선택 시 `start_session`→창 `hide()`(오버레이는 Rust가 자동 표시). 창은 숨김 재사용이므로 **`onFocusChanged`로 재표시마다 목록·필터·선택 초기화 + 입력 포커스**. 과목이 하나도 없으면 "과목 관리 열기"(→`requestFocusMain('subjects')`)로 유도.
+- **메인 창 표시·포커스 경로 일원화**: `focus-main` 이벤트(`ipc.ts` `requestFocusMain`/`onFocusMain`). 대시보드 핫키는 `MainApp`이 자기 창을 `unminimize→show→setFocus`(+화면 전환), 피커 빈 상태는 이 이벤트로 메인 창을 과목 관리 화면으로 연다.
+- **권한(창별 최소)**: `main.json`에 `global-shortcut:allow-register`/`allow-unregister`/`allow-unregister-all` + 자기 창 제어 `core:window:allow-show`/`allow-set-focus`/`allow-unminimize` 추가. `quickstart.json`에 `core:window:allow-hide` 추가(표시·포커스는 Rust `show_quickstart`가 처리하므로 JS 권한 불필요).
+
+**검증 결과**
+- `npm run build` ✅ (tsc + vite) · `cargo check` ✅ (경고·에러 0, tauri-build가 capabilities 권한 식별자까지 검증)
+- ⏳ 런타임 E2E는 **사용자 테스트 대기** — `npm run tauri dev` 후 **다른 앱(메모장 등)에 포커스를 둔 채로**: `Ctrl+Alt+S`→중앙에 피커 팝업(타이핑 필터·↑↓·숫자키·Esc), 과목 선택→측정 시작+오버레이 표시, `Ctrl+Alt+P` 정지/재개(오버레이 색 변화), `Ctrl+Alt+H` 오버레이 숨김/표시, `Ctrl+Alt+D` 메인 창 앞으로, `Ctrl+Alt+E` 종료+"세션 저장" toast. 과목이 없을 때 피커의 "과목 관리 열기"로 메인 유도.
 
 ### ✅ 단계 3 — 타이머 오버레이 창 (2026-07-18)
 **한 일**
@@ -109,11 +122,11 @@ npm run tauri build    # 배포 빌드 (단계 8)
 src/
   main.tsx                 # window.label 분기 진입점
   index.css                # Tailwind + 테마 토큰
-  windows/                 # MainApp(대시보드=측정검증/과목/저장리스너) / TimerOverlay(오버레이 완성) / QuickStart
-  hooks/{useSubjects,useSession,useOverlayWindow,useSessionRecorder}.ts
-  #   과목목록 / 측정상태구독 / 오버레이 위치·크기 저장·복원 / 종료→세션저장 단일 리스너
-  lib/{utils,db,types,subjects,ipc,sessions,time,settings}.ts
-  #   cn / DB연결 / 타입 / 과목CRUD·getSubject / invoke·event래퍼(+finished/toggleOverlay) / 세션저장 / 경과계산·포맷 / settings K-V
+  windows/                 # MainApp(대시보드=측정검증/과목/저장리스너/핫키등록) / TimerOverlay(완성) / QuickStart(피커 완성)
+  hooks/{useSubjects,useSession,useOverlayWindow,useSessionRecorder,useGlobalShortcuts}.ts
+  #   과목목록 / 측정상태구독 / 오버레이 위치·크기 / 종료→저장 리스너 / 전역핫키 등록(메인 창)
+  lib/{utils,db,types,subjects,ipc,sessions,time,settings,hotkeys}.ts
+  #   cn / DB연결 / 타입 / 과목CRUD / invoke·event래퍼(+showQuickstart/togglePause/focus-main) / 세션저장 / 경과계산 / settings K-V / 핫키 바인딩·기본값
   components/
     ui/{button,input,Modal,ConfirmDialog}.tsx
     subjects/{SubjectsScreen,SubjectEditor}.tsx
@@ -123,11 +136,11 @@ src-tauri/
     lib.rs                 # 플러그인 초기화 + 마이그레이션 + manage(상태) + invoke_handler
     main.rs
     state.rs               # Measurement(측정 상태 단일 소스) + Status + 스냅샷/요약
-    commands.rs            # start/pause/resume/stop/get_session_state/toggle_overlay
+    commands.rs            # start/pause/resume/stop/get_session_state/toggle_overlay/show_quickstart/toggle_pause
                            #   (+ session-changed/session-finished emit, 시작·종료 시 오버레이 show/hide)
                            # (tray.rs는 단계 7)
   migrations/0001_init.sql # subjects/sessions/settings
-  capabilities/{main,timer,quickstart}.json   # main에 sql:allow-execute 추가됨
+  capabilities/{main,timer,quickstart}.json   # main:sql+global-shortcut+자기창제어 / quickstart:hide
   tauri.conf.json          # 3-창 + productName/identifier
   Cargo.toml
 docs/                      # 기획/결정 문서

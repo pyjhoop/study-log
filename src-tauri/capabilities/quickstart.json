@@ -1,10 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "quickstart-capability",
-  "description": "빠른 시작 피커 창 권한 (표시/포커스 제어는 단계 4에서 추가)",
+  "description": "빠른 시작 피커 창 권한: 과목 목록 조회(sql), 선택/취소 시 자기 창 숨김. 표시·포커스는 Rust show_quickstart가 처리.",
   "windows": ["quickstart"],
   "permissions": [
     "core:default",
+    "core:window:allow-hide",
     "sql:default"
   ]
 }
