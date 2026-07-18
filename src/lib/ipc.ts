@@ -17,6 +17,8 @@ export const EVENT_SESSION_CHANGED = "session-changed";
 export const EVENT_SESSION_FINISHED = "session-finished";
 /** 메인 창을 표시·포커스(+선택 화면 전환) 요청 이벤트. 대시보드 핫키·피커 빈 상태 유도에서 사용. */
 export const EVENT_FOCUS_MAIN = "focus-main";
+/** 세션이 실제로 DB에 저장된 뒤 알리는 이벤트(대시보드 통계 새로고침용). */
+export const EVENT_SESSION_SAVED = "session-saved";
 
 /** 측정 시작. Idle일 때만 성공. */
 export function startSession(subjectId: number): Promise<SessionSnapshot> {
@@ -75,6 +77,16 @@ export function onSessionFinished(
 /** 메인 창 표시·포커스 요청을 보낸다(다른 창에서 호출). screen 지정 시 해당 화면으로 전환. */
 export function requestFocusMain(screen?: string): Promise<void> {
   return emit(EVENT_FOCUS_MAIN, { screen });
+}
+
+/** 세션 저장 완료를 알린다(저장 리스너가 INSERT 성공 후 호출). */
+export function emitSessionSaved(): Promise<void> {
+  return emit(EVENT_SESSION_SAVED);
+}
+
+/** `session-saved` 구독. 대시보드가 통계를 다시 읽는다. */
+export function onSessionSaved(handler: () => void): Promise<UnlistenFn> {
+  return listen(EVENT_SESSION_SAVED, () => handler());
 }
 
 /** `focus-main` 구독(메인 창에서). 표시·포커스하고 screen이 있으면 그 화면으로 전환. */

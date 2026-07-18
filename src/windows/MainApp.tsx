@@ -5,7 +5,7 @@ import { Toaster } from "sonner";
 import { cn } from "@/lib/utils";
 import { SubjectsScreen } from "@/components/subjects/SubjectsScreen";
 import { RecordsScreen } from "@/components/records/RecordsScreen";
-import { SessionTester } from "@/components/session/SessionTester";
+import { DashboardScreen } from "@/components/dashboard/DashboardScreen";
 import { useSessionRecorder } from "@/hooks/useSessionRecorder";
 import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
 import { onFocusMain } from "@/lib/ipc";
@@ -103,7 +103,7 @@ export default function MainApp() {
           ) : screen === "records" ? (
             <RecordsScreen />
           ) : screen === "dashboard" ? (
-            <SessionTester />
+            <DashboardScreen />
           ) : (
             <div className="flex h-full items-center justify-center rounded-xl border border-dashed">
               <div className="max-w-md text-center">

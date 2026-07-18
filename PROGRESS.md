@@ -19,7 +19,7 @@
 | 3 | 타이머 오버레이 창 (드래그·크기조절·숨김/표시·위치 복원) | ✅ 완료 |
 | 4 | 전역 핫키 + 빠른 시작 피커 | ✅ 완료 |
 | 5 | 세션 저장 + 기록 화면 | ✅ 완료 |
-| 6 | 대시보드 통계 (일/주/월 + 오늘 목표 링) | ⬜ |
+| 6 | 대시보드 통계 (일/주/월 + 오늘 목표 링) | ✅ 완료 |
 | 7 | 부가기능: 뽀모도로/목표 → 트레이 → 오버레이 커스터마이즈 + 설정 화면 | ⬜ |
 | 8 | 폴리시 & 패키징 (빈 상태/에러, 아이콘, 빌드) | ⬜ |
 
@@ -44,6 +44,18 @@ npm run tauri build    # 배포 빌드 (단계 8)
 ---
 
 ## 단계별 완료 로그
+
+### ✅ 단계 6 — 대시보드 통계 (2026-07-18)
+**한 일**
+- **통계 집계 계층**(`lib/stats.ts`): 세션 원시 행을 **한 번 조회**(`fetchStatRows` — 과목 이름/색 JOIN, 오래된→최근)해서 **일/주/월 버킷·과목별 분포·오늘/이번주/이번달 합계·연속 학습일수를 전부 JS(로컬 시계)에서 계산**. SQL `strftime` 대신 JS로 집계하는 이유는 주(week) 경계를 SQLite와 정확히 일치시키기 어렵고 빈 버킷 0채움도 어차피 JS라서(개인용 앱이라 전량 조회 비용 무시 가능). 주 경계는 **월요일 시작**, 버킷 수 일14/주8/월6, 빈 버킷은 0. 연속일수는 오늘 아직 공부 전이면 어제부터 세어 하루 중 0으로 안 보이게.
+- **데이터 훅**(`hooks/useStats.ts`): 원시 행 + 일일 목표(분, settings `daily_goal_min`, 기본 120) 로드·`reload`·`saveGoal`(0~1440 clamp). **`session-saved` 이벤트 구독**으로 종료→저장 시 자동 새로고침(집계·차트는 화면에서 `useMemo` 파생).
+- **저장 완료 신호**(`lib/ipc.ts` + `useSessionRecorder`): 새 이벤트 `session-saved` 추가 — 저장 리스너가 INSERT **성공 후** `emitSessionSaved()` → 대시보드가 **insert 완료 뒤** 통계를 다시 읽음(리로드가 저장과 경합하지 않게, 오버레이/핫키 종료도 반영).
+- **대시보드 화면**(`components/dashboard/`): `DashboardScreen`(조합) + ①`LiveMeasure`(과목 select→시작/일시정지/재개/종료 — 피커가 핫키 전용이라 마우스 측정 경로 제공, 상태는 `useSession` 구독) ②`GoalRing`(오늘 누적÷목표 SVG 도넛 + 달성 시 초록, 연필로 **즉석 목표 편집**·프리셋 30/60/120/180/240) ③요약 타일 4개(오늘/이번주/이번달/연속) ④`StudyBarChart`(Recharts 막대 + **일/주/월 토글**, 현재 버킷 강조, 커스텀 툴팁, 빈 기간 안내) ⑤`SubjectDonut`(선택 기간 과목별 도넛+범례·%) ⑥최근 세션 6개. 테마 색은 `hsl(var(--*))`로 라이트/다크 대응.
+- **정리**: 단계 2 임시 패널 `components/session/SessionTester.tsx` 삭제(대시보드로 대체), `MainApp` 대시보드 탭 → `<DashboardScreen/>`. **Rust·capabilities·마이그레이션 변경 없음**(조회는 `sql:default`, 목표 저장은 기존 `sql:allow-execute`).
+
+**검증 결과**
+- `npm run build` ✅ (tsc + vite, 2237 모듈 — recharts 번들 포함). Rust 변경 없어 `cargo check` 불필요.
+- ⏳ 런타임 E2E는 **사용자 테스트 대기** — `npm run tauri dev` 후 대시보드 탭에서: ①측정 시작→종료 시 오늘 링·요약·차트·최근 세션이 **자동 갱신**되는지 ②목표 연필→분 입력/프리셋→링·% 반영, 달성 시 초록·🎉 ③일/주/월 토글로 막대·과목 도넛 범위가 바뀌는지 ④여러 날짜 세션이 로컬 날짜 기준으로 정확히 집계·그룹되는지(주=월요일 시작) ⑤과목별 도넛 %·합계 ⑥연속 학습일수 ⑦과목 0개일 때 측정 카드가 "과목 관리 열기"로 유도.
 
 ### ✅ 단계 5 — 세션 저장 + 기록 화면 (2026-07-18)
 **한 일**
@@ -135,16 +147,16 @@ npm run tauri build    # 배포 빌드 (단계 8)
 src/
   main.tsx                 # window.label 분기 진입점
   index.css                # Tailwind + 테마 토큰
-  windows/                 # MainApp(대시보드=측정검증/기록/과목/저장리스너/핫키등록) / TimerOverlay(완성) / QuickStart(피커 완성)
-  hooks/{useSubjects,useSessions,useSession,useOverlayWindow,useSessionRecorder,useGlobalShortcuts}.ts
-  #   과목목록 / 세션목록 / 측정상태구독 / 오버레이 위치·크기 / 종료→저장 리스너 / 전역핫키 등록(메인 창)
-  lib/{utils,db,types,subjects,ipc,sessions,time,settings,hotkeys}.ts
-  #   cn / DB연결 / 타입 / 과목CRUD / invoke·event래퍼(+showQuickstart/togglePause/focus-main) / 세션 저장·조회·수정·삭제 / 경과·날짜·duration계산 / settings K-V / 핫키 바인딩·기본값
+  windows/                 # MainApp(대시보드/기록/과목/저장리스너/핫키등록) / TimerOverlay(완성) / QuickStart(피커 완성)
+  hooks/{useSubjects,useSessions,useSession,useStats,useOverlayWindow,useSessionRecorder,useGlobalShortcuts}.ts
+  #   과목목록 / 세션목록 / 측정상태구독 / 대시보드통계(행+목표+session-saved구독) / 오버레이 위치·크기 / 종료→저장 리스너 / 전역핫키 등록(메인 창)
+  lib/{utils,db,types,subjects,ipc,sessions,stats,time,settings,hotkeys}.ts
+  #   cn / DB연결 / 타입 / 과목CRUD / invoke·event래퍼(+showQuickstart/togglePause/focus-main/session-saved) / 세션 저장·조회·수정·삭제 / 통계 집계(일주월버킷·과목분포·연속일) / 경과·날짜·duration계산 / settings K-V / 핫키
   components/
     ui/{button,input,Modal,ConfirmDialog}.tsx
     subjects/{SubjectsScreen,SubjectEditor}.tsx
     records/{RecordsScreen,SessionEditor}.tsx   # 세션 일별 목록/수정/삭제/수동 추가·메모
-    session/SessionTester.tsx          # 단계 2 임시 검증 패널(+오버레이 토글 버튼, 단계 6에서 대시보드로 대체)
+    dashboard/{DashboardScreen,LiveMeasure,GoalRing,StudyBarChart,SubjectDonut}.tsx  # 통계 대시보드(Recharts)
 src-tauri/
   src/
     lib.rs                 # 플러그인 초기화 + 마이그레이션 + manage(상태) + invoke_handler

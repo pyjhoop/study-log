@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
-import { onSessionFinished } from "@/lib/ipc";
+import { emitSessionSaved, onSessionFinished } from "@/lib/ipc";
 import { saveSession } from "@/lib/sessions";
 import { getSubject } from "@/lib/subjects";
 import { formatHMS } from "@/lib/time";
@@ -22,6 +22,7 @@ export function useSessionRecorder() {
         const name = (await getSubject(summary.subject_id))?.name ?? "과목";
         if (saved) {
           toast.success(`세션 저장: ${name} · ${formatHMS(summary.duration_sec)}`);
+          void emitSessionSaved(); // 대시보드 통계 새로고침 신호
         } else {
           toast.info("공부 시간이 0초여서 저장하지 않았습니다.");
         }
