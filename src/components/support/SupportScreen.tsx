@@ -147,7 +147,8 @@ export function SupportScreen() {
         <p className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
           문제 파악을 돕기 위해 <b className="text-foreground">앱 버전</b>과{" "}
           <b className="text-foreground">실행 환경</b> 정보가 문의에 자동으로 첨부됩니다. 그 외 학습
-          기록 등 개인 데이터는 전송되지 않습니다.
+          기록 등 개인 데이터는 전송되지 않습니다. 입력하신 이메일은{" "}
+          <b className="text-foreground">답변 목적으로만</b> 사용되며 별도로 보관·공유하지 않습니다.
         </p>
 
         <div className="flex items-center justify-end border-t pt-3">
