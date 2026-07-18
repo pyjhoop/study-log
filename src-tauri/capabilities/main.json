@@ -17,6 +17,8 @@
     "core:tray:allow-get-by-id",
     "core:tray:allow-set-tooltip",
     "autostart:default",
+    "updater:default",
+    "process:allow-restart",
     {
       "identifier": "http:default",
       "allow": [{ "url": "https://api.github.com/*" }]

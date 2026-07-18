@@ -23,6 +23,8 @@ export const EVENT_SESSION_SAVED = "session-saved";
 export const EVENT_OVERLAY_OPTIONS_CHANGED = "overlay-options-changed";
 /** 전역 핫키 바인딩 변경 → 메인 창이 재등록. */
 export const EVENT_HOTKEYS_CHANGED = "hotkeys-changed";
+/** 설정의 "업데이트 확인" 버튼 → 메인 창의 업데이터가 수동 확인을 실행. */
+export const EVENT_CHECK_UPDATE = "check-update";
 
 /** 측정 시작. Idle일 때만 성공. */
 export function startSession(subjectId: number): Promise<SessionSnapshot> {
@@ -126,4 +128,14 @@ export function emitHotkeysChanged(): Promise<void> {
 /** `hotkeys-changed` 구독(메인 창). */
 export function onHotkeysChanged(handler: () => void): Promise<UnlistenFn> {
   return listen(EVENT_HOTKEYS_CHANGED, () => handler());
+}
+
+/** 수동 업데이트 확인 요청(설정 화면 → 메인 창). */
+export function emitCheckUpdate(): Promise<void> {
+  return emit(EVENT_CHECK_UPDATE);
+}
+
+/** `check-update` 구독(메인 창의 업데이터). */
+export function onCheckUpdate(handler: () => void): Promise<UnlistenFn> {
+  return listen(EVENT_CHECK_UPDATE, () => handler());
 }

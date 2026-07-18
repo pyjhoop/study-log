@@ -31,6 +31,8 @@ pub fn run() {
         .manage(Mutex::new(None::<state::SessionSummary>))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        // 자동 업데이트 설치 후 앱 재시작에 필요(plugin-updater와 함께 사용).
+        .plugin(tauri_plugin_process::init())
         // GitHub 백업/복원(F3)이 GitHub API를 CORS 없이 호출하기 위한 HTTP 플러그인.
         .plugin(tauri_plugin_http::init())
         .plugin(
@@ -44,6 +46,8 @@ pub fn run() {
     {
         builder = builder
             .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+            // 자동 업데이트(새 버전 확인·다운로드·설치). 프론트에서 check/downloadAndInstall 호출.
+            .plugin(tauri_plugin_updater::Builder::new().build())
             // 자동 시작. 부팅 실행을 `--autostart` 인자로 식별해 setup에서 조용히 상주시킨다.
             .plugin(tauri_plugin_autostart::init(
                 tauri_plugin_autostart::MacosLauncher::LaunchAgent,

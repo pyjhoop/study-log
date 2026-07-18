@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { PanelsTopLeft } from "lucide-react";
+import { PanelsTopLeft, RefreshCw } from "lucide-react";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/Switch";
+import { emitCheckUpdate } from "@/lib/ipc";
 import { Section, Row } from "./parts";
 
 /**
@@ -34,6 +36,20 @@ export function GeneralSection() {
     }
   };
 
+  // 수동 업데이트 확인 요청 → 메인 창의 UpdateDialog가 확인/팝업/안내를 처리한다.
+  const [checking, setChecking] = useState(false);
+  const checkUpdate = async () => {
+    setChecking(true);
+    try {
+      await emitCheckUpdate();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      // 실제 확인은 비동기라, 버튼은 잠깐만 비활성(중복 클릭 방지) 후 되돌린다.
+      setTimeout(() => setChecking(false), 1500);
+    }
+  };
+
   return (
     <Section icon={PanelsTopLeft} title="일반" description="자동 시작 · 트레이 상주 동작">
       <Row
@@ -46,6 +62,15 @@ export function GeneralSection() {
           disabled={busy}
           aria-label="Windows 시작 시 자동 실행"
         />
+      </Row>
+      <Row
+        label="업데이트"
+        hint="시작할 때 자동으로 새 버전을 확인합니다. 여기서 지금 바로 확인할 수도 있어요."
+      >
+        <Button variant="outline" size="sm" onClick={() => void checkUpdate()} disabled={checking}>
+          <RefreshCw className={checking ? "animate-spin" : ""} />
+          업데이트 확인
+        </Button>
       </Row>
       <ul className="space-y-1.5 border-t pt-3 text-xs text-muted-foreground">
         <li>· 창을 닫아도(X) 종료되지 않고 <b className="text-foreground">트레이로 숨겨</b> 백그라운드에서 계속 동작합니다.</li>

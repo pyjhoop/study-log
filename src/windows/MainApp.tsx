@@ -8,6 +8,7 @@ import { RecordsScreen } from "@/components/records/RecordsScreen";
 import { DashboardScreen } from "@/components/dashboard/DashboardScreen";
 import { StatsScreen } from "@/components/stats/StatsScreen";
 import { SettingsScreen } from "@/components/settings/SettingsScreen";
+import { UpdateDialog } from "@/components/UpdateDialog";
 import { useSessionRecorder } from "@/hooks/useSessionRecorder";
 import { useLiveSessionGuard } from "@/hooks/useLiveSessionGuard";
 import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
@@ -91,7 +92,7 @@ export default function MainApp() {
             </button>
           ))}
         </nav>
-        <div className="mt-auto px-2 text-[10px] text-muted-foreground">v3.1.1</div>
+        <div className="mt-auto px-2 text-[10px] text-muted-foreground">v3.2.0</div>
       </aside>
 
       {/* 콘텐츠 */}
@@ -113,6 +114,9 @@ export default function MainApp() {
           )}
         </section>
       </main>
+
+      {/* 시작 시 자동 업데이트 확인 + 설정의 수동 확인 처리(메인 창에서 1회). */}
+      <UpdateDialog />
 
       <Toaster richColors position="bottom-right" />
     </div>

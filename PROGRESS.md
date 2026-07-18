@@ -26,6 +26,7 @@
 | 10 | **v3**: 오버레이 레이아웃(variant) 6종 · 에셋 파일명 영문화(productName) · v3.0.0 | ✅ 완료 |
 | 11 | **v3.1**: 대시보드 학습 잔디(GitHub 컨트리뷰션 히트맵) · v3.1.0 | ✅ 완료 |
 | 12 | **안정성 보강**(멀티에이전트 코드리뷰 후속): 데이터 유실·경합·견고성·통계 표시 오차 수정 | ✅ 완료 |
+| 13 | **자동 업데이트**: 시작 시 새 버전 확인 → 팝업 → 다운로드·설치·재시작(서명 검증) · v3.2.0 | ✅ 완료 |
 
 - v2 기획: [`docs/03-v2-기능-기획.md`](./docs/03-v2-기능-기획.md)
 
@@ -50,6 +51,22 @@ npm run tauri build    # 배포 빌드 (단계 8)
 ---
 
 ## 단계별 완료 로그
+
+### ✅ 단계 13 — 자동 업데이트 (2026-07-18)
+버전 **3.1.1 → 3.2.0**(신규 기능). 상세: [`docs/05-자동-업데이트.md`](./docs/05-자동-업데이트.md).
+
+**한 일**
+- **`tauri-plugin-updater` + `tauri-plugin-process`** 도입(Cargo+npm). `lib.rs`에 updater(desktop)·process 등록.
+- **`tauri.conf.json`**: `bundle.createUpdaterArtifacts:true` + `plugins.updater`(pubkey·endpoints=GitHub Release latest.json·windows.installMode=passive). 서명 공개키 임베드.
+- **UI**(순수 프론트): `lib/updater.ts`(check/downloadAndInstall+relaunch 래퍼), `components/UpdateDialog.tsx`(메인 창 1회 마운트 — 시작 시 자동 확인 + `check-update` 이벤트로 수동 확인 + 새 버전 팝업·릴리스 노트·진행률), 설정 일반에 "업데이트 확인" 버튼(`GeneralSection.tsx`), `ipc.ts`에 `check-update` emit/listen. `MainApp`에 `<UpdateDialog/>` + 사이드바 v3.2.0.
+- **권한**: `main.json`에 `updater:default`·`process:allow-restart`.
+- **서명 키(minisign)**: `tauri signer generate`로 키쌍 생성(빈 비밀번호). 공개키는 config에, 개인키는 GitHub Actions 시크릿 `TAURI_SIGNING_PRIVATE_KEY`(+빈 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`)로 `gh secret set` 등록. **개인키는 리포에 커밋 안 함**(scratchpad에만 생성).
+- **`release.yml`**: 서명 env(TAURI_SIGNING_*) 주입 → tauri-action이 설치본 서명 + `latest.json`·`.sig` 생성·업로드.
+
+**검증 결과**
+- `npm run build` ✅ (tsc + vite, 2275 모듈) · `cargo check` ✅ (updater/process 컴파일, 권한 해결, `study-log v3.2.0`).
+- ⚠️ **전제**: 자동 업데이트는 **업데이터가 든 v3.2.0부터** 동작 — v3.2.0을 한 번 수동 설치해야 이후 버전이 자동 갱신됨.
+- ⏳ 런타임 E2E는 **사용자 테스트 대기** — 절차는 [`docs/05-자동-업데이트.md`](./docs/05-자동-업데이트.md) "검증 안내"(v3.2.0 설치 → 다음 태그 릴리스 → 재시작 시 팝업·업데이트·재시작).
 
 ### ✅ 단계 12 — 안정성 보강 (코드리뷰 후속) (2026-07-18)
 버전 **3.1.0 → 3.1.1**(버그·안정성 패치, 기능 추가 없음). 상세: [`docs/04-안정성-보강.md`](./docs/04-안정성-보강.md).

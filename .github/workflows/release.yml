@@ -42,9 +42,11 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # 코드 서명은 Not-V2. 서명을 붙일 때 아래 secrets를 채운다.
-          # TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          # TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # 자동 업데이트용 서명(minisign). 이 키가 있으면 tauri-action이 설치본에 서명하고
+          # latest.json + .sig 를 만들어 릴리스에 첨부한다 → 앱이 서명을 검증해 업데이트한다.
+          # (Authenticode 코드 서명과는 별개 — SmartScreen 경고는 여전히 있음.)
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           # 태그가 있으면 그 태그로, 수동 실행이면 앱 버전(__VERSION__)으로 릴리스한다.
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
