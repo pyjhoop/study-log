@@ -8,8 +8,15 @@ import { cn } from "@/lib/utils";
  * 기간별 통계 기록 표. 최근 기간이 위로 오고, 각 행은 학습 시간·세션 수와
  * **직전(더 이전) 기간 대비 증감**을 보여준다. 진행 중인 이번 기간은 '진행 중'으로 표시하고
  * 증감은 생략한다(완료 기간이 아니어서 완료 기간과 비교하면 오해 소지).
+ * 행을 클릭하면 그 기간으로 초점을 옮긴다.
  */
-export function PeriodTable({ buckets }: { buckets: StatBucket[] }) {
+export function PeriodTable({
+  buckets,
+  onSelect,
+}: {
+  buckets: StatBucket[];
+  onSelect: (offset: number) => void;
+}) {
   // 오래된→최근 순서에서 직전 기간 대비 증감을 구한 뒤 최근이 위로 오게 뒤집는다.
   const rows = useMemo(
     () =>
@@ -24,7 +31,7 @@ export function PeriodTable({ buckets }: { buckets: StatBucket[] }) {
     return (
       <div className="rounded-xl border bg-card p-5">
         <div className="py-8 text-center text-sm text-muted-foreground">
-          아직 기록된 통계가 없습니다.
+          이 범위에 기록된 통계가 없습니다.
         </div>
       </div>
     );
@@ -43,7 +50,14 @@ export function PeriodTable({ buckets }: { buckets: StatBucket[] }) {
         </thead>
         <tbody>
           {rows.map(({ bucket, delta }) => (
-            <tr key={bucket.key} className="border-b last:border-0">
+            <tr
+              key={bucket.key}
+              onClick={() => onSelect(bucket.offset)}
+              className={cn(
+                "cursor-pointer border-b last:border-0 transition-colors hover:bg-accent/50",
+                bucket.isFocused && "bg-primary/5",
+              )}
+            >
               <td className="px-4 py-2.5">
                 <span className="font-medium">{bucket.tooltip}</span>
                 {bucket.isCurrent && (

@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useStats } from "@/hooks/useStats";
 import {
   buildBuckets,
-  paceComparison,
-  rangeStart,
+  focusedStats,
   subjectBreakdown,
   type Granularity,
 } from "@/lib/stats";
+import { Button } from "@/components/ui/button";
 import { StudyBarChart } from "@/components/dashboard/StudyBarChart";
 import { SubjectDonut } from "@/components/dashboard/SubjectDonut";
 import { cn } from "@/lib/utils";
@@ -23,22 +24,30 @@ const TABS: { id: Granularity; label: string }[] = [
 const STATS_COUNT: Record<Granularity, number> = { day: 30, week: 12, month: 12 };
 
 /**
- * 통계 페이지: 일간/주간/월간을 전환하며 ①지난 기간 같은 시점 대비 증감(페이스)
- * ②기간별 추이 막대 ③기간별 통계 기록 표 ④과목별 분포를 본다.
+ * 통계 페이지: 일간/주간/월간을 고르고 **좌우 화살표로 기간을 이동**하며
+ * ①그 기간의 학습 시간·직전 대비 증감 ②과목별 분포 ③기간별 추이 막대 ④기간별 통계 기록 표를 본다.
+ * 화살표/표 클릭으로 초점 기간(offset)이 바뀌면 아래가 모두 그 기간을 반영한다.
  */
 export function StatsScreen() {
   const { rows, loading, error } = useStats();
   const [granularity, setGranularity] = useState<Granularity>("week");
+  // 초점 기간: 0 = 현재(오늘/이번주/이번달), 1 = 직전 …
+  const [offset, setOffset] = useState(0);
   const count = STATS_COUNT[granularity];
 
-  const cmp = useMemo(() => paceComparison(rows, granularity), [rows, granularity]);
+  const changeGranularity = (g: Granularity) => {
+    setGranularity(g);
+    setOffset(0); // 단위가 바뀌면 현재 기간으로 복귀
+  };
+
+  const stats = useMemo(() => focusedStats(rows, granularity, offset), [rows, granularity, offset]);
   const buckets = useMemo(
-    () => buildBuckets(rows, granularity, count),
-    [rows, granularity, count],
+    () => buildBuckets(rows, granularity, count, offset),
+    [rows, granularity, count, offset],
   );
   const slices = useMemo(
-    () => subjectBreakdown(rows, rangeStart(granularity, count)),
-    [rows, granularity, count],
+    () => subjectBreakdown(rows, stats.startSec, stats.endSec),
+    [rows, stats.startSec, stats.endSec],
   );
 
   if (error) {
@@ -54,13 +63,13 @@ export function StatsScreen() {
       {/* 기간 단위 전환 */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {loading ? "불러오는 중…" : "기간별 학습 통계와 지난 기간 대비 증감"}
+          {loading ? "불러오는 중…" : "기간을 이동하며 학습 통계와 지난 기간 대비 증감을 확인하세요"}
         </p>
         <div className="flex rounded-md border p-0.5">
           {TABS.map((t) => (
             <button
               key={t.id}
-              onClick={() => setGranularity(t.id)}
+              onClick={() => changeGranularity(t.id)}
               className={cn(
                 "rounded px-3 py-1.5 text-sm font-medium transition-colors",
                 granularity === t.id
@@ -74,23 +83,57 @@ export function StatsScreen() {
         </div>
       </div>
 
-      {/* 증감(페이스) + 과목별 분포 */}
+      {/* 기간 네비게이터 (좌우 화살표) */}
+      <div className="flex items-center justify-between rounded-xl border bg-card px-3 py-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setOffset((o) => o + 1)}
+          aria-label="이전 기간"
+        >
+          <ChevronLeft />
+        </Button>
+
+        <div className="flex flex-col items-center">
+          <span className="text-sm font-semibold">{stats.relLabel}</span>
+          <span className="text-xs text-muted-foreground">{stats.title}</span>
+        </div>
+
+        <div className="flex items-center gap-1">
+          {offset > 0 && (
+            <Button variant="ghost" size="sm" onClick={() => setOffset(0)}>
+              현재로
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setOffset((o) => Math.max(0, o - 1))}
+            disabled={!stats.canGoNewer}
+            aria-label="다음 기간"
+          >
+            <ChevronRight />
+          </Button>
+        </div>
+      </div>
+
+      {/* 선택 기간 증감 + 과목별 분포 */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <ComparisonCard cmp={cmp} />
+        <ComparisonCard stats={stats} />
         <SubjectDonut slices={slices} />
       </div>
 
-      {/* 기간별 추이 */}
+      {/* 기간별 추이 (초점 기간에서 끝나는 창) */}
       <StudyBarChart
         buckets={buckets}
         granularity={granularity}
-        onGranularityChange={setGranularity}
+        onGranularityChange={changeGranularity}
         title="기간별 학습 시간"
         showToggle={false}
       />
 
-      {/* 기간별 통계 기록 */}
-      <PeriodTable buckets={buckets} />
+      {/* 기간별 통계 기록 (행 클릭 시 그 기간으로 이동) */}
+      <PeriodTable buckets={buckets} onSelect={setOffset} />
     </div>
   );
 }

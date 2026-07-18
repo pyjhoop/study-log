@@ -96,7 +96,7 @@ export function StudyBarChart({
                   <Cell
                     key={d.key}
                     fill="hsl(var(--primary))"
-                    fillOpacity={d.isCurrent ? 1 : 0.35}
+                    fillOpacity={d.isFocused ? 1 : 0.35}
                   />
                 ))}
               </Bar>
