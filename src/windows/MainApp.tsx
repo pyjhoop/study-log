@@ -92,7 +92,7 @@ export default function MainApp() {
             </button>
           ))}
         </nav>
-        <div className="mt-auto px-2 text-[10px] text-muted-foreground">v4.0.0</div>
+        <div className="mt-auto px-2 text-[10px] text-muted-foreground">v4.0.1</div>
       </aside>
 
       {/* 콘텐츠 */}
