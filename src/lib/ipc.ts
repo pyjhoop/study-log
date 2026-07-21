@@ -23,6 +23,8 @@ export const EVENT_SESSION_SAVED = "session-saved";
 export const EVENT_OVERLAY_OPTIONS_CHANGED = "overlay-options-changed";
 /** 전역 핫키 바인딩 변경 → 메인 창이 재등록. */
 export const EVENT_HOTKEYS_CHANGED = "hotkeys-changed";
+/** 일일 목표시간 변경 → 대시보드·오버레이가 목표를 즉시 다시 읽음. */
+export const EVENT_GOAL_CHANGED = "goal-changed";
 /** 설정의 "업데이트 확인" 버튼 → 메인 창의 업데이터가 수동 확인을 실행. */
 export const EVENT_CHECK_UPDATE = "check-update";
 
@@ -128,6 +130,16 @@ export function emitHotkeysChanged(): Promise<void> {
 /** `hotkeys-changed` 구독(메인 창). */
 export function onHotkeysChanged(handler: () => void): Promise<UnlistenFn> {
   return listen(EVENT_HOTKEYS_CHANGED, () => handler());
+}
+
+/** 일일 목표시간 변경을 브로드캐스트한다(설정/대시보드 → 오버레이·대시보드 즉시 반영). */
+export function emitGoalChanged(): Promise<void> {
+  return emit(EVENT_GOAL_CHANGED);
+}
+
+/** `goal-changed` 구독. 목표% 표시가 있는 오버레이·대시보드가 목표를 다시 읽는다. */
+export function onGoalChanged(handler: () => void): Promise<UnlistenFn> {
+  return listen(EVENT_GOAL_CHANGED, () => handler());
 }
 
 /** 수동 업데이트 확인 요청(설정 화면 → 메인 창). */

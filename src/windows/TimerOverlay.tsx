@@ -5,7 +5,7 @@ import { useSession } from "@/hooks/useSession";
 import { useOverlayWindowPersistence } from "@/hooks/useOverlayWindow";
 import { useOverlayOptions } from "@/hooks/useOverlayOptions";
 import { usePomodoro } from "@/hooks/usePomodoro";
-import { pauseSession, resumeSession, stopSession, onSessionSaved } from "@/lib/ipc";
+import { pauseSession, resumeSession, stopSession, onSessionSaved, onGoalChanged } from "@/lib/ipc";
 import { getSubject } from "@/lib/subjects";
 import { getSetting } from "@/lib/settings";
 import { fetchTodaySec } from "@/lib/stats";
@@ -67,7 +67,7 @@ export default function TimerOverlay() {
   const [goalMin, setGoalMin] = useState(DEFAULT_DAILY_GOAL_MIN);
   useEffect(() => {
     if (!needGoal) return;
-    let unlisten: (() => void) | undefined;
+    const unlisteners: Array<() => void> = [];
     let cancelled = false;
     const load = () => {
       void fetchTodaySec()
@@ -78,13 +78,18 @@ export default function TimerOverlay() {
         .catch(() => {});
     };
     load();
-    void onSessionSaved(load).then((fn) => {
-      if (cancelled) fn();
-      else unlisten = fn;
-    });
+    // 세션 저장(누적 갱신) · 목표시간 변경(측정 중 설정 변경) 둘 다에 반응.
+    const subscribe = (on: (h: () => void) => Promise<() => void>) => {
+      void on(load).then((fn) => {
+        if (cancelled) fn();
+        else unlisteners.push(fn);
+      });
+    };
+    subscribe(onSessionSaved);
+    subscribe(onGoalChanged);
     return () => {
       cancelled = true;
-      unlisten?.();
+      unlisteners.forEach((fn) => fn());
     };
   }, [needGoal]);
 

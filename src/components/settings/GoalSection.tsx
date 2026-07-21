@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Target } from "lucide-react";
 import { toast } from "sonner";
 import { getSetting, setSetting } from "@/lib/settings";
+import { emitGoalChanged } from "@/lib/ipc";
 import { DAILY_GOAL_KEY, DEFAULT_DAILY_GOAL_MIN } from "@/hooks/useStats";
 import { Section, Row, NumberField } from "./parts";
 
@@ -23,6 +24,7 @@ export function GoalSection() {
     setGoalMin(min);
     try {
       await setSetting(DAILY_GOAL_KEY, min);
+      void emitGoalChanged(); // 오버레이·대시보드 즉시 반영(측정 중이어도)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
     }

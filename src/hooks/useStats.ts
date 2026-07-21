@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { onSessionSaved } from "@/lib/ipc";
+import { emitGoalChanged, onGoalChanged, onSessionSaved } from "@/lib/ipc";
 import { getSetting, setSetting } from "@/lib/settings";
 import { fetchStatRows, type StatRow } from "@/lib/stats";
 
@@ -55,12 +55,33 @@ export function useStats() {
     };
   }, [reload]);
 
+  // 목표시간이 다른 화면(설정)에서 바뀌면 목표만 다시 읽어 진행 링에 즉시 반영한다.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void onGoalChanged(() => {
+      void getSetting<number>(DAILY_GOAL_KEY)
+        .then((g) => {
+          if (!cancelled && typeof g === "number" && g > 0) setGoalMin(g);
+        })
+        .catch(() => {});
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlisten = fn;
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
+
   /** 일일 목표(분) 저장 + 즉시 반영. 저장 실패 시 toast로 알린다(조용히 삼키지 않게). */
   const saveGoal = useCallback(async (min: number) => {
     const clamped = Math.max(0, Math.min(1440, Math.round(min)));
     try {
       await setSetting(DAILY_GOAL_KEY, clamped);
       setGoalMin(clamped);
+      void emitGoalChanged(); // 오버레이·다른 화면 즉시 반영
     } catch (e) {
       toast.error(`목표 저장 실패: ${e instanceof Error ? e.message : String(e)}`);
     }
